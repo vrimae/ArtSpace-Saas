@@ -14,33 +14,33 @@
    ========================================================================== */
 
 :root {
-  /* Emerald & Obsidian Light Palette */
-  --color-primary: #10b981; 
+  /* Clean White, Pink & Blue Palette */
+  --color-primary: #ec4899; 
   --color-primary-text: #ffffff; 
-  --color-primary-light: #34d399;
-  --color-primary-lighter: rgba(16, 185, 129, 0.08);
-  --color-primary-dark: #059669;
-  --color-primary-glow: rgba(16, 185, 129, 0.15);
+  --color-primary-light: #f472b6;
+  --color-primary-lighter: rgba(236, 72, 153, 0.08);
+  --color-primary-dark: #db2777;
+  --color-primary-glow: rgba(236, 72, 153, 0.15);
 
-  --color-bg: #f8fafc;
+  --color-bg: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-alt: #f1f5f9;
+  --color-surface-alt: #f9fafb;
 
-  --color-text: #0f172a;
-  --color-text-secondary: #334155;
-  --color-text-light: #64748b;
+  --color-text: #1f2937;
+  --color-text-secondary: #4b5563;
+  --color-text-light: #9ca3af;
 
-  --color-border: #e2e8f0;
-  --color-border-light: #f1f5f9;
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
 
-  --color-income: #10b981;
-  --color-income-bg: rgba(16, 185, 129, 0.08);
-  --color-expense: #ef4444;
-  --color-expense-bg: rgba(239, 68, 68, 0.08);
+  --color-income: #3b82f6;
+  --color-income-bg: rgba(59, 130, 246, 0.08);
+  --color-expense: #ec4899;
+  --color-expense-bg: rgba(236, 72, 153, 0.08);
   --color-warning: #f59e0b;
   --color-warning-bg: rgba(245, 158, 11, 0.08);
-  --color-info: #3b82f6;
-  --color-info-bg: rgba(59, 130, 246, 0.08);
+  --color-info: #0ea5e9;
+  --color-info-bg: rgba(14, 165, 233, 0.08);
 
   /* Shadows */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -63,32 +63,32 @@
 }
 
 [data-theme='dark'] {
-  --color-primary: #10b981;
+  --color-primary: #ec4899;
   --color-primary-text: #ffffff;
-  --color-primary-light: #34d399;
-  --color-primary-lighter: rgba(16, 185, 129, 0.15);
-  --color-primary-dark: #059669;
-  --color-primary-glow: rgba(16, 185, 129, 0.2);
+  --color-primary-light: #f472b6;
+  --color-primary-lighter: rgba(236, 72, 153, 0.15);
+  --color-primary-dark: #db2777;
+  --color-primary-glow: rgba(236, 72, 153, 0.2);
 
-  --color-bg: #0a0a0a;
-  --color-surface: #171717;
-  --color-surface-alt: #262626;
+  --color-bg: #111827;
+  --color-surface: #1f2937;
+  --color-surface-alt: #374151;
 
-  --color-text: #ffffff;
-  --color-text-secondary: #a3a3a3;
-  --color-text-light: #737373;
+  --color-text: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-light: #9ca3af;
 
-  --color-border: #3f3f46;
-  --color-border-light: #27272a;
+  --color-border: #374151;
+  --color-border-light: #1f2937;
 
-  --color-income: #10b981;
-  --color-income-bg: rgba(16, 185, 129, 0.1);
-  --color-expense: #ef4444;
-  --color-expense-bg: rgba(239, 68, 68, 0.1);
+  --color-income: #3b82f6;
+  --color-income-bg: rgba(59, 130, 246, 0.1);
+  --color-expense: #ec4899;
+  --color-expense-bg: rgba(236, 72, 153, 0.1);
   --color-warning: #f59e0b;
   --color-warning-bg: rgba(245, 158, 11, 0.1);
-  --color-info: #3b82f6;
-  --color-info-bg: rgba(59, 130, 246, 0.1);
+  --color-info: #0ea5e9;
+  --color-info-bg: rgba(14, 165, 233, 0.1);
 }
 
 /* Theme Adaptive Logo */
