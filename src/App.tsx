@@ -109,7 +109,7 @@ const Sidebar = ({
     { to: '/finance',   icon: <Wallet size={18} />,          label: 'Keuangan'  },
     { to: '/inventory', icon: <PackageOpen size={18} />,     label: 'Inventori' },
     { to: '/analytics-pro', icon: <LayoutDashboard size={18} style={{color: '#F59E0B'}} />, label: 'Analitik Pro' },
-    { to: '/ai-assistant', icon: <Bot size={18} style={{color: '#10b981'}} />, label: 'Vrimae AI' },
+    { to: '/ai-assistant', icon: <Bot size={18} style={{color: '#EC4899'}} />, label: 'Vrimae AI' },
     { to: '/settings',  icon: <Settings size={18} />,        label: 'Setelan'   },
   ];
 

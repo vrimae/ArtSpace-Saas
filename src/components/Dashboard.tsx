@@ -58,7 +58,7 @@ const Dashboard = () => {
             <div className="stat-icon" style={{ background: 'var(--color-primary-lighter)', color: 'var(--color-primary)' }}><Wallet size={20} /></div>
             <div className="stat-label" style={{ margin: 0 }}>Total Pendapatan</div>
           </div>
-          <div className="stat-value" style={{ color: '#10B981' }}>{formatCurrency(totalIncome)}</div>
+          <div className="stat-value" style={{ color: '#3B82F6' }}>{formatCurrency(totalIncome)}</div>
         </div>
         <div className="stat-card">
           <div className="flex items-center gap-3 mb-2">

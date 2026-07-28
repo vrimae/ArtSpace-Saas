@@ -17,7 +17,7 @@ const formatShortCurrency = (val: number) => {
   return `Rp${val}`;
 };
 
-const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'];
+const COLORS = ['#EC4899', '#3B82F6', '#8B5CF6', '#F59E0B', '#0EA5E9'];
 
 type TimeFilter = 'today' | '7days' | 'month' | 'year';
 
@@ -422,7 +422,7 @@ const AnalyticsPro = () => {
                   itemStyle={{ fontWeight: 700 }}
                   labelStyle={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }}
                 />
-                <Line type="monotone" dataKey="income" name="income" stroke="#10B981" strokeWidth={4} dot={{ r: 4, fill: '#10B981', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }} animationDuration={1000} connectNulls />
+                <Line type="monotone" dataKey="income" name="income" stroke="#3B82F6" strokeWidth={4} dot={{ r: 4, fill: '#3B82F6', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }} animationDuration={1000} connectNulls />
                 {timeFilter === 'today' && (
                   <Line type="monotone" dataKey="kemarin" name="kemarin" stroke="var(--color-text-secondary)" strokeDasharray="5 5" strokeWidth={2} dot={false} activeDot={false} animationDuration={1000} />
                 )}
@@ -475,8 +475,8 @@ const AnalyticsPro = () => {
                   strokeWidth={2}
                   animationDuration={1000}
                 >
-                  <Cell fill="#10B981" />
-                  <Cell fill="#EF4444" />
+                  <Cell fill="#3B82F6" />
+                  <Cell fill="#EC4899" />
                 </Pie>
                 <RechartsTooltip 
                   formatter={(value: any) => [formatCurrency(Number(value)), 'Total']}
@@ -488,10 +488,10 @@ const AnalyticsPro = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10B981' }}></div> Pemasukan
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#3B82F6' }}></div> Pemasukan
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#EF4444' }}></div> Pengeluaran
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#EC4899' }}></div> Pengeluaran
             </div>
           </div>
         </div>
