@@ -120,7 +120,7 @@ const Sidebar = ({
   const hasAIAccess = userMetadata.ai_ends_at 
     ? new Date(userMetadata.ai_ends_at).getTime() > now 
     : false;
-  const isSuperAdmin = userEmail === 'bimdarmawa2@gmail.com';
+  const isSuperAdmin = userEmail === 'bimdarmawa2@gmail.com' || userEmail === 'vrimae23@gmail.com';
 
   const finalNav = isAdmin 
     ? [
@@ -679,7 +679,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/superadmin" element={
-                <ProtectedRoute isAllowed={isAdmin && session?.user?.email === 'bimdarmawa2@gmail.com'} loading={loading}>
+                <ProtectedRoute isAllowed={isAdmin && (session?.user?.email === 'bimdarmawa2@gmail.com' || session?.user?.email === 'vrimae23@gmail.com')} loading={loading}>
                   <SuperAdmin />
                 </ProtectedRoute>
               } />
