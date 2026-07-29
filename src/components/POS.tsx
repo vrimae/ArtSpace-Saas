@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext, type FormEvent, type CSSProperties } from 'react';
 import { format } from 'date-fns';
-import { ShoppingCart, Check, Trash2, Plus, Minus, Settings, Image as ImageIcon, Pencil, Tag, Search, X, ChevronUp, ChevronDown, Printer, CheckCircle, Lock } from 'lucide-react';
+import { ShoppingCart, Check, Trash2, Plus, Minus, Settings, Image as ImageIcon, Pencil, Tag, Search, X, ChevronUp, ChevronDown, Printer, CheckCircle, Lock, MessageCircle, Phone } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Receipt from './Receipt';
 import type { Product, ProductCategory, ExtraItem } from '../types';
@@ -31,6 +31,24 @@ interface CartItem {
 
 type CategoryFilter = 'all' | string;
 
+const sendWhatsAppToMember = (tx: any) => {
+  if (!tx || !tx.customerPhone) return;
+  let phone = tx.customerPhone.replace(/\D/g, '');
+  if (phone.startsWith('0')) {
+    phone = '62' + phone.slice(1);
+  } else if (phone.startsWith('8')) {
+    phone = '62' + phone;
+  }
+  
+  const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+  const itemsText = (tx.items || []).map((item: any) => `▪️ ${item.quantity}x ${item.product.name} (${formatCurrencyLocal(item.quantity * item.product.price)})`).join('\n');
+  
+  const message = `Halo Kak *${tx.customerName || 'Member'}*, terima kasih banyak telah berbelanja dan menjadi *Member Setia* di *Vrimae*! 💖✨\n\nBerikut rincian transaksi Anda:\n*ID Order:* ${tx.transactionId || 'Baru'}\n${itemsText}\n\n*Total Pembayaran:* ${formatCurrencyLocal(tx.total)} (${tx.paymentMethod})\n\nKami sangat bangga dan bahagia melayani Anda. Ditunggu kedatangannya kembali ya! 😊🙏`;
+  
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  window.open(url, '_blank');
+};
+
 const POS = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -39,6 +57,7 @@ const POS = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [newMenu, setNewMenu] = useState({ name: '', price: '', image: '', category: '' });
   
@@ -360,20 +379,29 @@ const POS = () => {
       
       const txId = txResult?.[0]?.id || `TRX-${Date.now()}`;
       
-      setLastTransaction({
+      const finishedTx = {
         items: [...cart],
         total: totalAmount,
         paymentMethod,
         customerName: customerName.trim() || 'Umum',
+        customerPhone: customerPhone.trim(),
         date: new Date(),
         transactionId: txId
-      });
+      };
+      setLastTransaction(finishedTx);
       
       setCart([]);
       setCustomerName('');
+      setCustomerPhone('');
       setShowQRISModal(false);
       setShowSuccessModal(true);
       showToast('success', 'Penjualan Berhasil!', `Total: ${formatCurrency(totalAmount)}`);
+
+      if (finishedTx.customerPhone) {
+        setTimeout(() => {
+          sendWhatsAppToMember(finishedTx);
+        }, 300);
+      }
 
       // Telegram Notification
       if (telegramConfig.token && telegramConfig.chatId) {
@@ -896,15 +924,21 @@ const POS = () => {
               onClick={() => setShowPaymentOptions(!showPaymentOptions)}
               style={{ justifyContent: 'space-between', alignItems: 'center', width: '100%', background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '0.85rem 1rem', marginBottom: '1rem', color: 'var(--color-text)', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', transition: 'all 0.2s' }}
             >
-              <span>{showPaymentOptions ? 'Sembunyikan Opsi Pemesan' : 'Atur Pemesan & Pembayaran'}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Phone size={16} style={{ color: 'var(--color-primary)' }} />
+                {showPaymentOptions ? 'Tutup Opsi Member' : (customerPhone ? `Member: ${customerName || customerPhone}` : '👤 Member WhatsApp & Pembayaran')}
+              </span>
               {showPaymentOptions ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
             </button>
 
             <div className={`payment-options-container ${showPaymentOptions ? 'show' : ''}`}>
-                <div style={{ marginBottom: '1rem' }}>
+                <div style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem', background: 'rgba(236, 72, 153, 0.04)', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(236, 72, 153, 0.15)' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <MessageCircle size={15} color="#22C55E" /> WhatsApp Struk & Member Loyalty
+                  </div>
                   <input
                     type="text"
-                    placeholder="Nama Pelanggan"
+                    placeholder="Nama Member / Pelanggan (Contoh: Kak Budi)"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     style={{
@@ -912,7 +946,7 @@ const POS = () => {
                       padding: '0.65rem 0.85rem',
                       borderRadius: '10px',
                       border: '1px solid var(--color-border)',
-                      background: 'var(--color-surface-alt)',
+                      background: 'var(--color-surface)',
                       fontSize: '0.85rem',
                       color: 'var(--color-text)',
                       outline: 'none',
@@ -921,6 +955,28 @@ const POS = () => {
                     onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
                     onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
                   />
+                  <input
+                    type="tel"
+                    placeholder="No. WhatsApp Member (Contoh: 081234567890)"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--color-border)',
+                      background: 'var(--color-surface)',
+                      fontSize: '0.85rem',
+                      color: 'var(--color-text)',
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
+                    onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
+                  />
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', lineHeight: 1.3 }}>
+                    ✨ <em>Saat pesanan selesai, struk digital & ucapan otomatis dikirim via WhatsApp!</em>
+                  </div>
                 </div>
                 
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -1496,8 +1552,27 @@ const POS = () => {
             <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
               Pembayaran via <strong>{lastTransaction.paymentMethod}</strong> sebesar <strong style={{ color: 'var(--color-primary)' }}>{formatCurrency(lastTransaction.total)}</strong> telah diterima.
             </p>
+
+            {lastTransaction.customerPhone && (
+              <div style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '12px', padding: '0.75rem 1rem', marginBottom: '1.25rem', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <MessageCircle size={26} color="#22C55E" style={{ flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text)' }}>Member: {lastTransaction.customerName || 'Pelanggan'} ({lastTransaction.customerPhone})</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>Pesan ucapan & struk WhatsApp otomatis terbuka!</div>
+                </div>
+              </div>
+            )}
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {lastTransaction.customerPhone && (
+                <button 
+                  className="btn" 
+                  onClick={() => sendWhatsAppToMember(lastTransaction)}
+                  style={{ padding: '0.85rem', width: '100%', background: 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)', cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
+                >
+                  <MessageCircle size={18} /> Kirim Ulang Struk WhatsApp
+                </button>
+              )}
               <button 
                 className="btn btn-primary" 
                 onClick={() => {
