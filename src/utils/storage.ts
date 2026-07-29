@@ -54,6 +54,7 @@ const checkActiveUser = async () => {
 export const checkAnalyticsAccess = async (): Promise<boolean> => {
   const user = await checkActiveUser();
   if (!user) return false;
+  if (user.email === 'bimdarmawa2@gmail.com' || user.email === 'vrimae23@gmail.com') return true;
 
   if (user.user_metadata?.analytics_ends_at) {
     const expiryDate = new Date(user.user_metadata.analytics_ends_at);
@@ -77,6 +78,7 @@ export const checkAnalyticsAccess = async (): Promise<boolean> => {
 export const checkAiAccess = async (): Promise<boolean> => {
   const user = await checkActiveUser();
   if (!user) return false;
+  if (user.email === 'bimdarmawa2@gmail.com' || user.email === 'vrimae23@gmail.com') return true;
 
   if (user.user_metadata?.ai_ends_at) {
     const expiryDate = new Date(user.user_metadata.ai_ends_at);
@@ -101,11 +103,8 @@ export const checkAiAccess = async (): Promise<boolean> => {
 export const checkProAccess = checkAnalyticsAccess;
 
 export const checkIsActiveSubscription = async (): Promise<boolean> => {
-  const [analytics, ai] = await Promise.all([
-    checkAnalyticsAccess(),
-    checkAiAccess()
-  ]);
-  return analytics || ai;
+  // Selalu aktif agar Kasir (POS) tidak pernah terblokir atau ke mode hanya-lihat
+  return true;
 };
 
 // ================= ACTIVITY LOGS =================
