@@ -58,6 +58,9 @@ const Settings = () => {
     telegramBotToken: '',
     telegramChatId: '',
     geminiApiKey: '',
+    waGatewayToken: '',
+    waGatewayUrl: '',
+    waTestPhone: '',
   });
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -92,6 +95,8 @@ const Settings = () => {
           telegramBotToken: user.user_metadata?.telegram_bot_token || '',
           telegramChatId: user.user_metadata?.telegram_chat_id || '',
           geminiApiKey: user.user_metadata?.gemini_api_key || '',
+          waGatewayToken: user.user_metadata?.wa_gateway_token || '',
+          waGatewayUrl: user.user_metadata?.wa_gateway_url || 'https://api.fonnte.com/send',
         }));
       }
     });
@@ -240,6 +245,8 @@ const Settings = () => {
           telegram_bot_token: formData.telegramBotToken,
           telegram_chat_id: formData.telegramChatId,
           gemini_api_key: formData.geminiApiKey,
+          wa_gateway_token: formData.waGatewayToken,
+          wa_gateway_url: formData.waGatewayUrl || 'https://api.fonnte.com/send',
         }
       };
 
@@ -305,6 +312,42 @@ const Settings = () => {
       showToast('success', 'Berhasil', 'Pesan test terkirim ke Telegram Anda');
     } catch (error: any) {
       showToast('error', 'Koneksi Gagal', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTestWAGateway = async () => {
+    if (!formData.waGatewayToken || !formData.waTestPhone) {
+      showToast('error', 'Gagal', 'Token WA Gateway (Fonnte) dan No. HP Tujuan Test harus diisi.');
+      return;
+    }
+    setLoading(true);
+    try {
+      let phone = formData.waTestPhone.replace(/\D/g, '');
+      if (phone.startsWith('0')) phone = '62' + phone.slice(1);
+      else if (phone.startsWith('8')) phone = '62' + phone;
+
+      const url = formData.waGatewayUrl || 'https://api.fonnte.com/send';
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': formData.waGatewayToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          target: phone,
+          message: '✅ *Test WhatsApp Gateway Vrimae*\n\nSelamat! Sistem kasir Vrimae Anda kini terhubung secara OTOMATIS ke WhatsApp pelanggan TANPA PERLU MEMBUKA TAB/BROWSER.',
+          countryCode: '62'
+        })
+      });
+      const result = await response.json();
+      if (result.status === false && result.reason) {
+        throw new Error(result.reason);
+      }
+      showToast('success', 'Berhasil', 'Pesan test terkirim otomatis di balik layar ke WA: ' + phone);
+    } catch (error: any) {
+      showToast('error', 'Koneksi WA Gateway Gagal', error.message || 'Periksa kembali token Fonnte atau koneksi Anda.');
     } finally {
       setLoading(false);
     }
@@ -533,6 +576,53 @@ const Settings = () => {
                         <MessageCircle size={16} /> Test
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '1rem', paddingTop: '1.5rem', borderTop: '1px dashed var(--color-border)' }}>
+                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <MessageCircle size={15} style={{ color: '#22C55E' }} /> WhatsApp Gateway (Pesan Otomatis Tanpa Buka Tab)
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+                  Agar pesan struk & ucapan ke member dikirim <strong>100% otomatis di balik layar</strong> tanpa membuka aplikasi/tab WA di komputer/HP kasir, hubungkan <strong>Token API</strong> dari <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>Fonnte.com</a> (penyedia WhatsApp Bot populer di Indonesia) atau penyedia gateway lain.
+                </p>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div className="form-group mb-0">
+                    <label className="form-label">Token API Fonnte / Gateway</label>
+                    <input 
+                      type="text" className="form-input" placeholder="Masukkan Token Rahasia Fonnte Anda..."
+                      value={formData.waGatewayToken || ''} onChange={e => setFormData({...formData, waGatewayToken: e.target.value})} 
+                      style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label">URL Gateway API (Opsional)</label>
+                    <input 
+                      type="text" className="form-input" placeholder="https://api.fonnte.com/send"
+                      value={formData.waGatewayUrl || ''} onChange={e => setFormData({...formData, waGatewayUrl: e.target.value})} 
+                      style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                </div>
+                <div className="form-group mb-0" style={{ maxWidth: '350px' }}>
+                  <label className="form-label">Uji Coba Kirim WA Tanpa Buka Tab</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input 
+                      type="tel" className="form-input" placeholder="No. HP Anda (0812345...)"
+                      value={formData.waTestPhone || ''} onChange={e => setFormData({...formData, waTestPhone: e.target.value})} 
+                      style={{ fontSize: '0.85rem' }}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={handleTestWAGateway}
+                      className="btn btn-outline"
+                      style={{ padding: '0 1rem', whiteSpace: 'nowrap', borderColor: '#22C55E', color: '#22C55E' }}
+                      title="Test Kirim Pesan"
+                    >
+                      <MessageCircle size={16} /> Test WA
+                    </button>
                   </div>
                 </div>
               </div>

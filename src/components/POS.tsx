@@ -31,24 +31,6 @@ interface CartItem {
 
 type CategoryFilter = 'all' | string;
 
-const sendWhatsAppToMember = (tx: any) => {
-  if (!tx || !tx.customerPhone) return;
-  let phone = tx.customerPhone.replace(/\D/g, '');
-  if (phone.startsWith('0')) {
-    phone = '62' + phone.slice(1);
-  } else if (phone.startsWith('8')) {
-    phone = '62' + phone;
-  }
-  
-  const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
-  const itemsText = (tx.items || []).map((item: any) => `▪️ ${item.quantity}x ${item.product.name} (${formatCurrencyLocal(item.quantity * item.product.price)})`).join('\n');
-  
-  const message = `Halo Kak *${tx.customerName || 'Member'}*, terima kasih banyak telah berbelanja dan menjadi *Member Setia* di *Vrimae*! 💖✨\n\nBerikut rincian transaksi Anda:\n*ID Order:* ${tx.transactionId || 'Baru'}\n${itemsText}\n\n*Total Pembayaran:* ${formatCurrencyLocal(tx.total)} (${tx.paymentMethod})\n\nKami sangat bangga dan bahagia melayani Anda. Ditunggu kedatangannya kembali ya! 😊🙏`;
-  
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  window.open(url, '_blank');
-};
-
 const POS = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -80,9 +62,56 @@ const POS = () => {
   const [dynamicQRIS, setDynamicQRIS] = useState('');
   const [qrisString, setQrisString] = useState('');
   const [telegramConfig, setTelegramConfig] = useState({ token: '', chatId: '' });
+  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: 'https://api.fonnte.com/send' });
   const [isActiveSubscription, setIsActiveSubscription] = useState(true);
   const { showToast } = useToast();
   const { isAdmin } = useContext(AuthContext);
+
+  const sendWhatsAppToMember = (tx: any) => {
+    if (!tx || !tx.customerPhone) return;
+    let phone = tx.customerPhone.replace(/\D/g, '');
+    if (phone.startsWith('0')) {
+      phone = '62' + phone.slice(1);
+    } else if (phone.startsWith('8')) {
+      phone = '62' + phone;
+    }
+    
+    const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+    const itemsText = (tx.items || []).map((item: any) => `▪️ ${item.quantity}x ${item.product.name} (${formatCurrencyLocal(item.quantity * item.product.price)})`).join('\n');
+    
+    const message = `Halo Kak *${tx.customerName || 'Member'}*, terima kasih banyak telah berbelanja dan menjadi *Member Setia* di *Vrimae*! 💖✨\n\nBerikut rincian transaksi Anda:\n*ID Order:* ${tx.transactionId || 'Baru'}\n${itemsText}\n\n*Total Pembayaran:* ${formatCurrencyLocal(tx.total)} (${tx.paymentMethod})\n\nKami sangat bangga dan bahagia melayani Anda. Ditunggu kedatangannya kembali ya! 😊🙏`;
+    
+    if (waGatewayConfig.token) {
+      const endpoint = waGatewayConfig.url || 'https://api.fonnte.com/send';
+      fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': waGatewayConfig.token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          target: phone,
+          message: message,
+          countryCode: '62'
+        })
+      }).then(res => res.json()).then(data => {
+        console.log('WA Gateway response:', data);
+        if (data.status === false) {
+          throw new Error(data.reason || 'Gagal dari pihak Fonnte');
+        }
+        showToast('success', 'Struk WA Terkirim!', `Pesan otomatis terkirim ke HP Member (${phone}) di balik layar tanpa membuka tab.`);
+      }).catch(err => {
+        console.error('WA Gateway error:', err);
+        showToast('error', 'WA Gateway Gagal', 'Mencoba membuka WhatsApp di tab browser sebagai cadangan...');
+        const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+      });
+    } else {
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+      showToast('info', 'Membuka WhatsApp Web', 'Tips: Hubungkan Token Fonnte di menu Setelan agar WA terkirim 100% otomatis TANPA BUKA TAB!');
+    }
+  };
 
   // Drag and drop states
   const [draggedProductId, setDraggedProductId] = useState<string | null>(null);
@@ -219,6 +248,10 @@ const POS = () => {
         setTelegramConfig({
           token: user.user_metadata.telegram_bot_token || '',
           chatId: user.user_metadata.telegram_chat_id || ''
+        });
+        setWaGatewayConfig({
+          token: user.user_metadata.wa_gateway_token || '',
+          url: user.user_metadata.wa_gateway_url || 'https://api.fonnte.com/send'
         });
       }
     });
