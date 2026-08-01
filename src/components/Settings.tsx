@@ -58,8 +58,8 @@ const Settings = () => {
     telegramBotToken: '',
     telegramChatId: '',
     geminiApiKey: '',
-    waGatewayToken: '',
-    waGatewayUrl: '',
+    waGatewayToken: 'SbmGAc1TxotP4TGuCGpS',
+    waGatewayUrl: 'https://api.fonnte.com/send',
     waTestPhone: '',
     waCustomTemplate: '',
   });
@@ -96,7 +96,7 @@ const Settings = () => {
           telegramBotToken: user.user_metadata?.telegram_bot_token || '',
           telegramChatId: user.user_metadata?.telegram_chat_id || '',
           geminiApiKey: user.user_metadata?.gemini_api_key || '',
-          waGatewayToken: user.user_metadata?.wa_gateway_token || '',
+          waGatewayToken: user.user_metadata?.wa_gateway_token || 'SbmGAc1TxotP4TGuCGpS',
           waGatewayUrl: user.user_metadata?.wa_gateway_url || 'https://api.fonnte.com/send',
           waCustomTemplate: user.user_metadata?.wa_custom_template || '',
         }));

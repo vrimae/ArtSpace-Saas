@@ -62,7 +62,7 @@ const POS = () => {
   const [dynamicQRIS, setDynamicQRIS] = useState('');
   const [qrisString, setQrisString] = useState('');
   const [telegramConfig, setTelegramConfig] = useState({ token: '', chatId: '' });
-  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: 'https://api.fonnte.com/send', customTemplate: '', shopName: 'Vrimae' });
+  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: 'SbmGAc1TxotP4TGuCGpS', url: 'https://api.fonnte.com/send', customTemplate: '', shopName: 'Vrimae' });
   const [isActiveSubscription, setIsActiveSubscription] = useState(true);
   const [memberPurchaseCount, setMemberPurchaseCount] = useState<number | null>(null);
   const [checkingMember, setCheckingMember] = useState(false);
@@ -307,7 +307,7 @@ const POS = () => {
           chatId: user.user_metadata.telegram_chat_id || ''
         });
         setWaGatewayConfig({
-          token: user.user_metadata.wa_gateway_token || '',
+          token: user.user_metadata.wa_gateway_token || 'SbmGAc1TxotP4TGuCGpS',
           url: user.user_metadata.wa_gateway_url || 'https://api.fonnte.com/send',
           customTemplate: user.user_metadata.wa_custom_template || '',
           shopName: user.user_metadata.shop_name || 'Vrimae'
