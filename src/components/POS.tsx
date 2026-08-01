@@ -64,8 +64,44 @@ const POS = () => {
   const [telegramConfig, setTelegramConfig] = useState({ token: '', chatId: '' });
   const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: 'https://api.fonnte.com/send' });
   const [isActiveSubscription, setIsActiveSubscription] = useState(true);
+  const [memberPurchaseCount, setMemberPurchaseCount] = useState<number | null>(null);
+  const [checkingMember, setCheckingMember] = useState(false);
   const { showToast } = useToast();
   const { isAdmin } = useContext(AuthContext);
+
+  useEffect(() => {
+    if (!customerPhone.trim()) {
+      setMemberPurchaseCount(null);
+      return;
+    }
+    const corePhone = customerPhone.replace(/\D/g, '').replace(/^(62|0)/, '');
+    if (corePhone.length < 8) {
+      setMemberPurchaseCount(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setCheckingMember(true);
+      try {
+        const { count, error } = await supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .ilike('description', `%[WA: %${corePhone}%]%`);
+        
+        if (!error) {
+          setMemberPurchaseCount(count || 0);
+        } else {
+          setMemberPurchaseCount(0);
+        }
+      } catch (e) {
+        setMemberPurchaseCount(0);
+      } finally {
+        setCheckingMember(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [customerPhone]);
 
   const sendWhatsAppToMember = (tx: any) => {
     if (!tx || !tx.customerPhone) return;
@@ -79,7 +115,12 @@ const POS = () => {
     const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
     const itemsText = (tx.items || []).map((item: any) => `▪️ ${item.quantity}x ${item.product.name} (${formatCurrencyLocal(item.quantity * item.product.price)})`).join('\n');
     
-    const message = `Halo Kak *${tx.customerName || 'Member'}*, terima kasih banyak telah berbelanja dan menjadi *Member Setia* di *Vrimae*! 💖✨\n\nBerikut rincian transaksi Anda:\n*ID Order:* ${tx.transactionId || 'Baru'}\n${itemsText}\n\n*Total Pembayaran:* ${formatCurrencyLocal(tx.total)} (${tx.paymentMethod})\n\nKami sangat bangga dan bahagia melayani Anda. Ditunggu kedatangannya kembali ya! 😊🙏`;
+    const countText = tx.purchaseCount ? `\n*Pembelian ke:* ${tx.purchaseCount} 🎉` : '';
+    const loyaltyGreeting = (tx.purchaseCount && tx.purchaseCount > 1)
+      ? `Terima kasih banyak telah menjadi *Member Setia* kami! 💖✨ Ini adalah *pembelian ke-${tx.purchaseCount}* Anda di *Vrimae*! 🥳🔥`
+      : `Selamat datang di *Vrimae*! 💖✨ Terima kasih atas *pembelian perdana (ke-1)* Anda di toko kami! 🥳🔥`;
+      
+    const message = `Halo Kak *${tx.customerName || 'Member'}*,\n${loyaltyGreeting}\n\nBerikut rincian transaksi Anda:\n*ID Order:* ${tx.transactionId || 'Baru'}${countText}\n${itemsText}\n\n*Total Pembayaran:* ${formatCurrencyLocal(tx.total)} (${tx.paymentMethod})\n\nKami sangat bangga dan bahagia melayani Anda. Ditunggu kedatangannya kembali ya! 😊🙏`;
     
     if (waGatewayConfig.token) {
       const endpoint = waGatewayConfig.url || 'https://api.fonnte.com/send';
@@ -393,11 +434,16 @@ const POS = () => {
         return item.product.name + addOnStr + extraStr + noteStr + " (" + item.quantity + "x)";
       }).join(', ');
       
+      const cleanPhone = customerPhone.trim().replace(/\D/g, '');
+      const corePhone = cleanPhone.replace(/^(62|0)/, '');
+      const phoneTag = corePhone ? ` [WA: ${corePhone}]` : '';
       const baseDesc = customerName.trim() 
         ? `Pesanan: ${customerName.trim()} - ${description}` 
         : `Pesanan: Umum - ${description}`;
-      const finalDescription = `[${paymentMethod}] ${baseDesc}`;
-  
+      const finalDescription = `[${paymentMethod}] ${baseDesc}${phoneTag}`;
+      
+      const currentPurchaseCount = (memberPurchaseCount !== null && corePhone.length >= 8) ? (memberPurchaseCount + 1) : 1;
+
       const txResult = await addTransaction({
         type: 'income' as const,
         amount: totalAmount,
@@ -419,13 +465,15 @@ const POS = () => {
         customerName: customerName.trim() || 'Umum',
         customerPhone: customerPhone.trim(),
         date: new Date(),
-        transactionId: txId
+        transactionId: txId,
+        purchaseCount: currentPurchaseCount
       };
       setLastTransaction(finishedTx);
       
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
+      setMemberPurchaseCount(null);
       setShowQRISModal(false);
       setShowSuccessModal(true);
       showToast('success', 'Penjualan Berhasil!', `Total: ${formatCurrency(totalAmount)}`);
@@ -1007,6 +1055,31 @@ const POS = () => {
                     onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
                     onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
                   />
+                  {checkingMember && (
+                    <div style={{ fontSize: '0.78rem', color: 'var(--color-primary)', fontWeight: 600 }}>
+                      ⏳ Memeriksa riwayat kunjungan member...
+                    </div>
+                  )}
+                  {!checkingMember && memberPurchaseCount !== null && (
+                    <div style={{
+                      padding: '0.5rem 0.75rem',
+                      background: memberPurchaseCount > 0 ? 'rgba(59, 130, 246, 0.12)' : 'rgba(34, 197, 94, 0.12)',
+                      border: `1px solid ${memberPurchaseCount > 0 ? 'rgba(59, 130, 246, 0.35)' : 'rgba(34, 197, 94, 0.35)'}`,
+                      borderRadius: '8px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      color: memberPurchaseCount > 0 ? '#3B82F6' : '#16A34A',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}>
+                      {memberPurchaseCount > 0 ? (
+                        <>🎉 Member Setia! Sudah {memberPurchaseCount}x transaksi (Ini pembelian ke-{memberPurchaseCount + 1})</>
+                      ) : (
+                        <>✨ Member Baru! (Ini adalah pembelian perdana / ke-1)</>
+                      )}
+                    </div>
+                  )}
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', lineHeight: 1.3 }}>
                     ✨ <em>Saat pesanan selesai, struk digital & ucapan otomatis dikirim via WhatsApp!</em>
                   </div>
@@ -1590,7 +1663,7 @@ const POS = () => {
               <div style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '12px', padding: '0.75rem 1rem', marginBottom: '1.25rem', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <MessageCircle size={26} color="#22C55E" style={{ flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text)' }}>Member: {lastTransaction.customerName || 'Pelanggan'} ({lastTransaction.customerPhone})</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text)' }}>Member: {lastTransaction.customerName || 'Pelanggan'} ({lastTransaction.customerPhone}) {lastTransaction.purchaseCount ? `• Pembelian ke-${lastTransaction.purchaseCount} 🎉` : ''}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>Pesan ucapan & struk WhatsApp otomatis terbuka!</div>
                 </div>
               </div>
