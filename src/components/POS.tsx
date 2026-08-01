@@ -62,7 +62,7 @@ const POS = () => {
   const [dynamicQRIS, setDynamicQRIS] = useState('');
   const [qrisString, setQrisString] = useState('');
   const [telegramConfig, setTelegramConfig] = useState({ token: '', chatId: '' });
-  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: 'https://api.fonnte.com/send' });
+  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: 'https://api.fonnte.com/send', customTemplate: '', shopName: 'Vrimae' });
   const [isActiveSubscription, setIsActiveSubscription] = useState(true);
   const [memberPurchaseCount, setMemberPurchaseCount] = useState<number | null>(null);
   const [checkingMember, setCheckingMember] = useState(false);
@@ -115,12 +115,28 @@ const POS = () => {
     const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
     const itemsText = (tx.items || []).map((item: any) => `▪️ ${item.quantity}x ${item.product.name} (${formatCurrencyLocal(item.quantity * item.product.price)})`).join('\n');
     
-    const countText = tx.purchaseCount ? `\n*Pembelian ke:* ${tx.purchaseCount} 🎉` : '';
-    const loyaltyGreeting = (tx.purchaseCount && tx.purchaseCount > 1)
-      ? `Terima kasih banyak telah menjadi *Member Setia* kami! 💖✨ Ini adalah *pembelian ke-${tx.purchaseCount}* Anda di *Vrimae*! 🥳🔥`
-      : `Selamat datang di *Vrimae*! 💖✨ Terima kasih atas *pembelian perdana (ke-1)* Anda di toko kami! 🥳🔥`;
-      
-    const message = `Halo Kak *${tx.customerName || 'Member'}*,\n${loyaltyGreeting}\n\nBerikut rincian transaksi Anda:\n*ID Order:* ${tx.transactionId || 'Baru'}${countText}\n${itemsText}\n\n*Total Pembayaran:* ${formatCurrencyLocal(tx.total)} (${tx.paymentMethod})\n\nKami sangat bangga dan bahagia melayani Anda. Ditunggu kedatangannya kembali ya! 😊🙏`;
+    const countVal = tx.purchaseCount || 1;
+    const countText = `*Pembelian ke:* ${countVal} 🎉`;
+    const rincianText = `*ID Order:* ${tx.transactionId || 'Baru'}\n${countText}\n${itemsText}`;
+    const totalText = `${formatCurrencyLocal(tx.total)} (${tx.paymentMethod})`;
+    const customerNameVal = tx.customerName || 'Member';
+    const shopNameVal = waGatewayConfig.shopName || 'Vrimae';
+
+    let message = '';
+    if (waGatewayConfig.customTemplate && waGatewayConfig.customTemplate.trim() !== '') {
+      message = waGatewayConfig.customTemplate
+        .replace(/\{nama\}/gi, customerNameVal)
+        .replace(/\{kunjungan\}/gi, countVal.toString())
+        .replace(/\{toko\}/gi, shopNameVal)
+        .replace(/\{rincian\}/gi, rincianText)
+        .replace(/\{total\}/gi, totalText);
+    } else {
+      const loyaltyGreeting = countVal > 1
+        ? `Terima kasih banyak telah menjadi *Member Setia* kami! 💖✨ Ini adalah *pembelian ke-${countVal}* Anda di *${shopNameVal}*! 🥳🔥`
+        : `Selamat datang di *${shopNameVal}*! 💖✨ Terima kasih atas *pembelian perdana (ke-1)* Anda di toko kami! 🥳🔥`;
+        
+      message = `Halo Kak *${customerNameVal}*,\n${loyaltyGreeting}\n\nBerikut rincian transaksi Anda:\n${rincianText}\n\n*Total Pembayaran:* ${totalText}\n\nKami sangat bangga dan bahagia melayani Anda. Ditunggu kedatangannya kembali ya! 😊🙏`;
+    }
     
     if (waGatewayConfig.token) {
       const endpoint = waGatewayConfig.url || 'https://api.fonnte.com/send';
@@ -292,7 +308,9 @@ const POS = () => {
         });
         setWaGatewayConfig({
           token: user.user_metadata.wa_gateway_token || '',
-          url: user.user_metadata.wa_gateway_url || 'https://api.fonnte.com/send'
+          url: user.user_metadata.wa_gateway_url || 'https://api.fonnte.com/send',
+          customTemplate: user.user_metadata.wa_custom_template || '',
+          shopName: user.user_metadata.shop_name || 'Vrimae'
         });
       }
     });

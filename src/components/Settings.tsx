@@ -61,6 +61,7 @@ const Settings = () => {
     waGatewayToken: '',
     waGatewayUrl: '',
     waTestPhone: '',
+    waCustomTemplate: '',
   });
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -97,6 +98,7 @@ const Settings = () => {
           geminiApiKey: user.user_metadata?.gemini_api_key || '',
           waGatewayToken: user.user_metadata?.wa_gateway_token || '',
           waGatewayUrl: user.user_metadata?.wa_gateway_url || 'https://api.fonnte.com/send',
+          waCustomTemplate: user.user_metadata?.wa_custom_template || '',
         }));
       }
     });
@@ -247,6 +249,7 @@ const Settings = () => {
           gemini_api_key: formData.geminiApiKey,
           wa_gateway_token: formData.waGatewayToken,
           wa_gateway_url: formData.waGatewayUrl || 'https://api.fonnte.com/send',
+          wa_custom_template: formData.waCustomTemplate,
         }
       };
 
@@ -624,6 +627,30 @@ const Settings = () => {
                       <MessageCircle size={16} /> Test WA
                     </button>
                   </div>
+                </div>
+                <div className="form-group mb-0" style={{ marginTop: '1.25rem' }}>
+                  <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>📝 Template Pesan WhatsApp & Member Loyalty (Custom)</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 400 }}>Opsional (Biarkan kosong untuk default)</span>
+                  </label>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem', background: 'rgba(59, 130, 246, 0.05)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                    💡 <strong>Variabel Otomatis:</strong> Gunakan kata kunci berikut di dalam template pesan Anda. Sistem kasir akan menggantinya dengan angka/data asli saat mengirim:
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
+                      <span style={{ background: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--color-border)', fontFamily: 'monospace', fontWeight: 700 }}>{`{nama}`}</span> = Nama Pelanggan
+                      <span style={{ background: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--color-border)', fontFamily: 'monospace', fontWeight: 700 }}>{`{kunjungan}`}</span> = Angka pembelian ke-X (dihitung otomatis)
+                      <span style={{ background: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--color-border)', fontFamily: 'monospace', fontWeight: 700 }}>{`{toko}`}</span> = Nama Toko Anda
+                      <span style={{ background: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--color-border)', fontFamily: 'monospace', fontWeight: 700 }}>{`{rincian}`}</span> = Daftar Belanja & ID Order
+                      <span style={{ background: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--color-border)', fontFamily: 'monospace', fontWeight: 700 }}>{`{total}`}</span> = Total Bayar
+                    </div>
+                  </div>
+                  <textarea 
+                    className="form-input" 
+                    rows={6}
+                    placeholder={`Contoh Custom:\nHalo Kak {nama}! Makasih banyak udah belanja di {toko} 💖✨\nSelamat! Ini adalah pembelian ke-{kunjungan} Kamu lho 🥳🔥\n\nBerikut pesananmu:\n{rincian}\nTotal Bayar: {total}\n\nDitunggu mampir lagi ya! 😊`}
+                    value={formData.waCustomTemplate || ''} 
+                    onChange={e => setFormData({...formData, waCustomTemplate: e.target.value})}
+                    style={{ fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: 1.5, resize: 'vertical' }}
+                  />
                 </div>
               </div>
               
