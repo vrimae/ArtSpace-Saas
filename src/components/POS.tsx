@@ -11,7 +11,7 @@ import { formatCurrencyInput } from '../utils/currencyInput';
 import { AuthContext } from '../App';
 import { supabase } from '../lib/supabase';
 import Cropper from 'react-easy-crop';
-import getCroppedImg from '../utils/cropImage';
+import getCroppedImg, { compressImage } from '../utils/cropImage';
 
 interface AddOn {
   id: string;
@@ -635,8 +635,8 @@ const POS = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('error', 'Gagal', 'Ukuran gambar maksimal 5MB');
+    if (file.size > 30 * 1024 * 1024) {
+      showToast('error', 'Gagal', 'Ukuran gambar maksimal 30MB');
       return;
     }
 
@@ -895,10 +895,15 @@ const POS = () => {
               {/* ── Foto ── */}
               <div style={{ position: 'relative', width: '100%', height: '200px', flexShrink: 0, overflow: 'hidden', borderRadius: '14px 14px 0 0' }}>
                 <img
-                  src={product.image}
+                  src={product.image || '/default-item.svg'}
                   alt={product.name}
                   loading="lazy"
                   draggable={false}
+                  onError={(e) => {
+                    if (!e.currentTarget.src.endsWith('/default-item.svg')) {
+                      e.currentTarget.src = '/default-item.svg';
+                    }
+                  }}
                   style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block' }}
                 />
               </div>
@@ -1595,7 +1600,7 @@ const POS = () => {
                                   }}
                                 >
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
-                                    <img src={p.image} draggable={false} alt={p.name} style={{ width: 30, height: 30, borderRadius: 'var(--radius-sm)', objectFit: 'cover', flexShrink: 0 }} />
+                                    <img src={p.image || '/default-item.svg'} draggable={false} alt={p.name} onError={(e) => { if (!e.currentTarget.src.endsWith('/default-item.svg')) e.currentTarget.src = '/default-item.svg'; }} style={{ width: 30, height: 30, borderRadius: 'var(--radius-sm)', objectFit: 'cover', flexShrink: 0 }} />
                                     <div style={{ minWidth: 0 }}>
                                       <div style={{ fontWeight: 600, fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
                                       <div style={{ color: 'var(--color-primary)', fontSize: '0.75rem', fontWeight: 700 }}>{formatCurrency(p.price)}</div>
@@ -2082,9 +2087,10 @@ const POS = () => {
             </div>
             <div className="flex flex-wrap gap-2 justify-end mt-2">
               <button type="button" className="btn btn-outline" onClick={() => setCropImageSrc(null)}>Batal</button>
-              <button type="button" className="btn btn-outline" style={{ border: '1px solid var(--color-primary)', color: 'var(--color-primary)', fontWeight: 600 }} onClick={() => {
+              <button type="button" className="btn btn-outline" style={{ border: '1px solid var(--color-primary)', color: 'var(--color-primary)', fontWeight: 600 }} onClick={async () => {
                 if (cropImageSrc) {
-                  setNewMenu({ ...newMenu, image: cropImageSrc });
+                  const compressed = await compressImage(cropImageSrc, 450, 0.75);
+                  setNewMenu({ ...newMenu, image: compressed });
                   setCropImageSrc(null);
                 }
               }}>
@@ -2093,12 +2099,13 @@ const POS = () => {
               <button type="button" className="btn btn-primary" onClick={async () => {
                 if (cropImageSrc) {
                   try {
-                    const targetCrop = croppedAreaPixels || { x: 0, y: 0, width: 500, height: 500 };
+                    const targetCrop = croppedAreaPixels || { x: 0, y: 0, width: 450, height: 450 };
                     const croppedImage = await getCroppedImg(cropImageSrc, targetCrop);
                     setNewMenu({ ...newMenu, image: croppedImage });
                   } catch (e) {
-                    console.warn('Fallback ke foto asli karena kendala canvas browser', e);
-                    setNewMenu({ ...newMenu, image: cropImageSrc });
+                    console.warn('Fallback ke foto asli terkompresi', e);
+                    const compressed = await compressImage(cropImageSrc, 450, 0.75);
+                    setNewMenu({ ...newMenu, image: compressed });
                   }
                   setCropImageSrc(null);
                 }

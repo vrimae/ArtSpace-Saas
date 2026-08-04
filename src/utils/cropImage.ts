@@ -76,9 +76,38 @@ export default async function getCroppedImg(
   );
 
   // As Base64 string
-  return croppedCanvas.toDataURL('image/jpeg', 0.8);
+  return croppedCanvas.toDataURL('image/jpeg', 0.75);
   } catch (err) {
-    console.warn('Cropping error occurred, returning original image source:', err);
+    console.warn('Cropping error occurred, returning compressed original image source:', err);
+    return await compressImage(imageSrc);
+  }
+}
+
+export async function compressImage(imageSrc: string, maxSize = 450, quality = 0.75): Promise<string> {
+  try {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return imageSrc;
+
+    let { width, height } = image;
+    if (width > maxSize || height > maxSize) {
+      if (width > height) {
+        height = Math.round((height * maxSize) / width);
+        width = maxSize;
+      } else {
+        width = Math.round((width * maxSize) / height);
+        height = maxSize;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(image, 0, 0, width, height);
+
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch (err) {
+    console.warn('Compression failed, returning raw image:', err);
     return imageSrc;
   }
 }
