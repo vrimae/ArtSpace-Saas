@@ -484,10 +484,6 @@ const POS = () => {
         date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ssXXX")
       });
       
-      // Deduct inventory based on extras
-      await deductInventory(cart);
-      await fetchInventoryAndRecipes(); // Refresh local inventory state
-      
       const txId = txResult?.[0]?.id || `TRX-${Date.now()}`;
       
       const finishedTx = {
@@ -509,6 +505,14 @@ const POS = () => {
       setShowQRISModal(false);
       setShowSuccessModal(true);
       showToast('success', 'Penjualan Berhasil!', `Total: ${formatCurrency(totalAmount)}`);
+
+      // ⚡ ASYNC BACKGROUND EXECUTION (Non-Blocking Response to User)
+      // Pemotongan stok bahan/resep, update riwayat, & notifikasi dikerjakan secara asynchronous di background
+      setTimeout(() => {
+        deductInventory(finishedTx.items).then(() => {
+          fetchInventoryAndRecipes();
+        }).catch(err => console.error('Async inventory check error:', err));
+      }, 50);
 
       if (finishedTx.customerPhone) {
         setTimeout(() => {

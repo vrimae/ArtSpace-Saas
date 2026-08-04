@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { checkAnalyticsAccess, getTransactions, getInventory } from '../utils/storage';
+import { checkAnalyticsAccess, getTransactions, getInventory, getUser } from '../utils/storage';
 import { supabase } from '../lib/supabase';
 import { Crown, Lock, TrendingUp, PackageOpen, ArrowDownRight, ArrowUpRight, ArrowRight, Wallet, Calendar, ChevronDown, Users } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -48,17 +48,28 @@ const AnalyticsPro = () => {
           
           await fetchInitial();
 
-          const subscription = supabase
-            .channel('public:transactions')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
-              getTransactions().then(setAllTransactions);
-            })
-            .subscribe();
+          const user = await getUser();
+          let subscription: any = null;
+          if (user) {
+            subscription = supabase
+              .channel(`transactions_channel_${user.id}`)
+              .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'transactions',
+                filter: `user_id=eq.${user.id}`
+              }, () => {
+                getTransactions().then(setAllTransactions);
+              })
+              .subscribe();
+          }
 
           setLoading(false);
 
           return () => {
-            supabase.removeChannel(subscription);
+            if (subscription) {
+              supabase.removeChannel(subscription);
+            }
           };
         } else {
           setLoading(false);

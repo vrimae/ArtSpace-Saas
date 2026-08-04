@@ -113,7 +113,7 @@ export const logActivity = async (action: string, description: string, actorName
   const payload: any = { action, description };
   if (actorName) payload.actor_name = actorName;
   if (reason) payload.reason = reason;
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUser();
   if (user) {
     payload.user_id = user.id;
   }
@@ -200,15 +200,18 @@ export const addTransaction = async (t: Omit<Transaction, 'id'> & { id?: string 
     description: t.description,
     date: t.date,
     user_id: user.id
-  }]).select();
+  }]).select('id');
   
   if (error) {
     handleApiError('Gagal menambah transaksi', error);
     throw new Error(error.message);
   }
   
-  const formattedAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(t.amount);
-  logActivity('ADD_TRANSACTION', `Menambahkan ${t.type === 'income' ? 'pemasukan' : 'pengeluaran'} baru: ${t.category} sebesar ${formattedAmount} (${t.description})`, actorName, reason);
+  // ⚡ NON-BLOCKING ASYNC LOGGING
+  setTimeout(() => {
+    const formattedAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(t.amount);
+    logActivity('ADD_TRANSACTION', `Menambahkan ${t.type === 'income' ? 'pemasukan' : 'pengeluaran'} baru: ${t.category} sebesar ${formattedAmount} (${t.description})`, actorName, reason);
+  }, 10);
   
   return data;
 };
