@@ -59,7 +59,7 @@ const Settings = () => {
     telegramChatId: '',
     geminiApiKey: '',
     waGatewayToken: 'SbmGAc1TxotP4TGuCGpS',
-    waGatewayUrl: 'https://api.fonnte.com/send',
+    waGatewayUrl: '/api/fonnte/send',
     waTestPhone: '',
     waCustomTemplate: '',
   });
@@ -97,7 +97,7 @@ const Settings = () => {
           telegramChatId: user.user_metadata?.telegram_chat_id || '',
           geminiApiKey: user.user_metadata?.gemini_api_key || '',
           waGatewayToken: user.user_metadata?.wa_gateway_token || 'SbmGAc1TxotP4TGuCGpS',
-          waGatewayUrl: user.user_metadata?.wa_gateway_url || 'https://api.fonnte.com/send',
+          waGatewayUrl: (user.user_metadata?.wa_gateway_url && !user.user_metadata?.wa_gateway_url.includes('api.fonnte.com')) ? user.user_metadata?.wa_gateway_url : '/api/fonnte/send',
           waCustomTemplate: user.user_metadata?.wa_custom_template || '',
         }));
       }
@@ -248,7 +248,7 @@ const Settings = () => {
           telegram_chat_id: formData.telegramChatId,
           gemini_api_key: formData.geminiApiKey,
           wa_gateway_token: formData.waGatewayToken,
-          wa_gateway_url: formData.waGatewayUrl || 'https://api.fonnte.com/send',
+          wa_gateway_url: formData.waGatewayUrl || '/api/fonnte/send',
           wa_custom_template: formData.waCustomTemplate,
         }
       };
@@ -331,7 +331,10 @@ const Settings = () => {
       if (phone.startsWith('0')) phone = '62' + phone.slice(1);
       else if (phone.startsWith('8')) phone = '62' + phone;
 
-      const url = formData.waGatewayUrl || 'https://api.fonnte.com/send';
+      let url = formData.waGatewayUrl || '/api/fonnte/send';
+      if (url === 'https://api.fonnte.com/send' || url.includes('api.fonnte.com')) {
+        url = '/api/fonnte/send';
+      }
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -603,7 +606,7 @@ const Settings = () => {
                   <div className="form-group mb-0">
                     <label className="form-label">URL Gateway API (Opsional)</label>
                     <input 
-                      type="text" className="form-input" placeholder="https://api.fonnte.com/send"
+                      type="text" className="form-input" placeholder="/api/fonnte/send"
                       value={formData.waGatewayUrl || ''} onChange={e => setFormData({...formData, waGatewayUrl: e.target.value})} 
                       style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
                     />

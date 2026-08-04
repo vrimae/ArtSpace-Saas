@@ -62,7 +62,7 @@ const POS = () => {
   const [dynamicQRIS, setDynamicQRIS] = useState('');
   const [qrisString, setQrisString] = useState('');
   const [telegramConfig, setTelegramConfig] = useState({ token: '', chatId: '' });
-  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: 'SbmGAc1TxotP4TGuCGpS', url: 'https://api.fonnte.com/send', customTemplate: '', shopName: 'Vrimae' });
+  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: 'SbmGAc1TxotP4TGuCGpS', url: '/api/fonnte/send', customTemplate: '', shopName: 'Vrimae' });
   const [isActiveSubscription, setIsActiveSubscription] = useState(true);
   const [memberPurchaseCount, setMemberPurchaseCount] = useState<number | null>(null);
   const [checkingMember, setCheckingMember] = useState(false);
@@ -139,7 +139,10 @@ const POS = () => {
     }
     
     if (waGatewayConfig.token) {
-      const endpoint = waGatewayConfig.url || 'https://api.fonnte.com/send';
+      let endpoint = waGatewayConfig.url || '/api/fonnte/send';
+      if (endpoint === 'https://api.fonnte.com/send' || endpoint.includes('api.fonnte.com')) {
+        endpoint = '/api/fonnte/send';
+      }
       fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -308,7 +311,7 @@ const POS = () => {
         });
         setWaGatewayConfig({
           token: user.user_metadata.wa_gateway_token || 'SbmGAc1TxotP4TGuCGpS',
-          url: user.user_metadata.wa_gateway_url || 'https://api.fonnte.com/send',
+          url: (user.user_metadata?.wa_gateway_url && !user.user_metadata?.wa_gateway_url.includes('api.fonnte.com')) ? user.user_metadata?.wa_gateway_url : '/api/fonnte/send',
           customTemplate: user.user_metadata.wa_custom_template || '',
           shopName: user.user_metadata.shop_name || 'Vrimae'
         });
