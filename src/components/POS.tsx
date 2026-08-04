@@ -631,24 +631,61 @@ const POS = () => {
     }
   };
 
+  const checkValidImage = (file: File): boolean => {
+    if (file.size > 30 * 1024 * 1024) {
+      showToast('error', 'Gagal', 'Ukuran gambar maksimal 30MB');
+      return false;
+    }
+    const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif') || file.type.includes('heic') || file.type.includes('heif');
+    if (isHeic) {
+      showToast('error', 'Format Foto iPhone (HEIC) Tidak Didukung', 'Browser Windows tidak dapat membuka foto iPhone format .HEIC/.HEIF. Silakan ubah foto ke JPG/PNG, atau ambil screenshot dari foto tersebut lalu upload.');
+      return false;
+    }
+    return true;
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 30 * 1024 * 1024) {
-      showToast('error', 'Gagal', 'Ukuran gambar maksimal 30MB');
+    if (!checkValidImage(file)) {
+      e.target.value = '';
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
       setCropImageSrc(reader.result as string);
+      e.target.value = '';
     };
     reader.onerror = () => {
       showToast('error', 'Gagal Membaca File', 'File gambar tidak dapat dibaca dari sistem Anda.');
+      e.target.value = '';
     };
     reader.readAsDataURL(file);
-    e.target.value = '';
+  };
+
+  const handleDirectImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!checkValidImage(file)) {
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const rawUrl = reader.result as string;
+      showToast('info', 'Memproses Foto...', 'Sedang mengkompresi foto agar cepat tersimpan...');
+      const compressed = await compressImage(rawUrl, 450, 0.75);
+      setNewMenu(prev => ({ ...prev, image: compressed }));
+      showToast('success', 'Foto Terpasang', 'Foto berhasil dipasang langsung tanpa crop.');
+      e.target.value = '';
+    };
+    reader.onerror = () => {
+      showToast('error', 'Gagal Membaca File', 'File gambar tidak dapat dibaca.');
+      e.target.value = '';
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteMenu = async (id: string, name: string) => {
@@ -1422,10 +1459,16 @@ const POS = () => {
                             <ImageIcon size={20} className="text-muted" />
                           </div>
                         )}
-                        <label style={{ cursor: 'pointer', padding: '0.5rem 1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', fontWeight: 500, background: 'var(--color-surface)' }} className="hover:opacity-80 transition-opacity">
-                          Pilih Foto
-                          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
-                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          <label style={{ cursor: 'pointer', padding: '0.45rem 0.85rem', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 600, background: 'var(--color-primary)', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} className="hover:opacity-90 transition-opacity">
+                            ⚡ Langsung Pasang (Tanpa Crop)
+                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleDirectImageUpload} />
+                          </label>
+                          <label style={{ cursor: 'pointer', padding: '0.45rem 0.85rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 500, background: 'var(--color-surface)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} className="hover:opacity-80 transition-opacity">
+                            🖼️ Pilih & Potong (Crop)
+                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+                          </label>
+                        </div>
                       </div>
                     </div>
 
@@ -2084,6 +2127,9 @@ const POS = () => {
                 onChange={(e) => setZoom(Number(e.target.value))}
                 style={{ width: '100%' }}
               />
+            </div>
+            <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.75rem', color: 'var(--color-text)' }}>
+              💡 <em>Catatan:</em> Jika foto tampak kosong/abu-abu di atas (karena kendala kompatibilitas browser/kamera HP), silakan klik tombol <strong>"Gunakan Tanpa Potong"</strong> untuk tetap memasang foto tanpa error.
             </div>
             <div className="flex flex-wrap gap-2 justify-end mt-2">
               <button type="button" className="btn btn-outline" onClick={() => setCropImageSrc(null)}>Batal</button>
