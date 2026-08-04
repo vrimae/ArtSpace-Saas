@@ -367,8 +367,16 @@ const App = () => {
   const [adminPin, setAdminPin] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
+      if (session?.user) {
+        // Ambil data metadata user terbaru dari database (agar perubahan dari Super Admin langsung terverifikasi)
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (user && !error) {
+          session.user = user;
+          setSession({ ...session, user });
+        }
+      }
       if (session?.user?.user_metadata?.admin_pin) {
         setAdminPin(session.user.user_metadata.admin_pin);
         setIsAdmin(false); // Default to Kasir mode if PIN is set
@@ -379,8 +387,15 @@ const App = () => {
 
       setTimeout(() => setLoading(false), 1500);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
+      if (session?.user) {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (user && !error) {
+          session.user = user;
+          setSession((prev: any) => (prev ? { ...prev, user } : { user }));
+        }
+      }
       if (session?.user?.user_metadata?.admin_pin) {
         setAdminPin(session.user.user_metadata.admin_pin);
         if (event === 'SIGNED_IN') setIsAdmin(false);

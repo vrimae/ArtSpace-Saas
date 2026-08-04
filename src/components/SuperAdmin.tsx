@@ -54,14 +54,12 @@ const SuperAdmin: React.FC = () => {
   const handleSaveSubscription = async () => {
     if (!editingUser) return;
     
-    if (editDuration === 0) {
+    let currentDuration = editDuration;
+    if (currentDuration === 0) {
       if (editTier === 'komplit' && (!editingUser.analytics_ends_at || !editingUser.ai_ends_at)) {
-        showToast('error', 'Durasi Wajib Diisi', 'Akun ini belum memiliki paket Komplit. Silakan pilih durasi untuk mengaktifkannya (misal: 7 atau 30 Hari).');
-        return;
-      }
-      if (editTier === 'analytics_pro' && !editingUser.analytics_ends_at) {
-        showToast('error', 'Durasi Wajib Diisi', 'Akun ini belum memiliki paket Analitik Pro. Silakan pilih durasi untuk mengaktifkannya (misal: 7 atau 30 Hari).');
-        return;
+        currentDuration = 30;
+      } else if (editTier === 'analytics_pro' && !editingUser.analytics_ends_at) {
+        currentDuration = 30;
       }
     }
 
@@ -69,14 +67,14 @@ const SuperAdmin: React.FC = () => {
     let newAiDate = editingUser.ai_ends_at;
     
     // Hitung tanggal kadaluarsa baru jika durasi diubah
-    if (editDuration === -1) {
+    if (currentDuration === -1 || editTier === 'biasa') {
        // Cabut akses (Reset ke Versi Biasa)
        newAnalyticsDate = null;
        newAiDate = null;
-    } else if (editDuration > 0) {
+    } else if (currentDuration > 0) {
        // Tambah hari dari SAAT INI
        const futureDate = new Date();
-       futureDate.setDate(futureDate.getDate() + editDuration);
+       futureDate.setDate(futureDate.getDate() + currentDuration);
        const futureStr = futureDate.toISOString();
        
        if (editTier === 'analytics_pro') {
@@ -86,7 +84,7 @@ const SuperAdmin: React.FC = () => {
          newAnalyticsDate = futureStr;
          newAiDate = futureStr;
        }
-    } else if (editDuration === 0) {
+    } else if (currentDuration === 0) {
        // Jika durasi tidak diubah, tapi tier diturunkan
        if (editTier === 'biasa') {
          newAnalyticsDate = null;
@@ -297,7 +295,13 @@ const SuperAdmin: React.FC = () => {
               <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text)', fontWeight: 500 }}>Ubah Tipe Akun</label>
               <select 
                 value={editTier} 
-                onChange={(e) => setEditTier(e.target.value as any)}
+                onChange={(e) => {
+                  const val = e.target.value as any;
+                  setEditTier(val);
+                  if (val !== 'biasa' && editDuration === 0) {
+                    setEditDuration(30); // Otomatis pilihkan 30 hari saat upgrade tier
+                  }
+                }}
                 style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', outline: 'none' }}
               >
                 <option value="biasa">Versi Biasa (Gratis)</option>
