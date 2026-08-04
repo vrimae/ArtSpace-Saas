@@ -3,7 +3,9 @@ export const createImage = (url: string): Promise<HTMLImageElement> =>
     const image = new Image();
     image.addEventListener('load', () => resolve(image));
     image.addEventListener('error', (error) => reject(error));
-    image.setAttribute('crossOrigin', 'anonymous'); // needed to avoid cross-origin issues
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      image.setAttribute('crossOrigin', 'anonymous');
+    }
     image.src = url;
   });
 
@@ -16,13 +18,14 @@ export default async function getCroppedImg(
   pixelCrop: { x: number; y: number; width: number; height: number },
   rotation = 0
 ): Promise<string> {
-  const image = await createImage(imageSrc);
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  try {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
 
-  if (!ctx) {
-    return '';
-  }
+    if (!ctx) {
+      return imageSrc;
+    }
 
   // set canvas size to match the bounding box
   canvas.width = image.width;
@@ -37,7 +40,7 @@ export default async function getCroppedImg(
   const croppedCtx = croppedCanvas.getContext('2d');
 
   if (!croppedCtx) {
-    return '';
+    return imageSrc;
   }
 
   // Define max dimensions (500x500)
@@ -74,4 +77,8 @@ export default async function getCroppedImg(
 
   // As Base64 string
   return croppedCanvas.toDataURL('image/jpeg', 0.8);
+  } catch (err) {
+    console.warn('Cropping error occurred, returning original image source:', err);
+    return imageSrc;
+  }
 }

@@ -639,7 +639,11 @@ const POS = () => {
     reader.onload = () => {
       setCropImageSrc(reader.result as string);
     };
+    reader.onerror = () => {
+      showToast('error', 'Gagal Membaca File', 'File gambar tidak dapat dibaca dari sistem Anda.');
+    };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleDeleteMenu = async (id: string, name: string) => {
@@ -1984,18 +1988,27 @@ const POS = () => {
                 style={{ width: '100%' }}
               />
             </div>
-            <div className="flex gap-2 justify-end mt-2">
-              <button className="btn btn-outline" onClick={() => setCropImageSrc(null)}>Batal</button>
-              <button className="btn btn-primary flex-1" onClick={async () => {
-                if (cropImageSrc && croppedAreaPixels) {
+            <div className="flex flex-wrap gap-2 justify-end mt-2">
+              <button type="button" className="btn btn-outline" onClick={() => setCropImageSrc(null)}>Batal</button>
+              <button type="button" className="btn btn-outline" style={{ border: '1px solid var(--color-primary)', color: 'var(--color-primary)', fontWeight: 600 }} onClick={() => {
+                if (cropImageSrc) {
+                  setNewMenu({ ...newMenu, image: cropImageSrc });
+                  setCropImageSrc(null);
+                }
+              }}>
+                Gunakan Tanpa Potong
+              </button>
+              <button type="button" className="btn btn-primary" onClick={async () => {
+                if (cropImageSrc) {
                   try {
-                    const croppedImage = await getCroppedImg(cropImageSrc, croppedAreaPixels);
+                    const targetCrop = croppedAreaPixels || { x: 0, y: 0, width: 500, height: 500 };
+                    const croppedImage = await getCroppedImg(cropImageSrc, targetCrop);
                     setNewMenu({ ...newMenu, image: croppedImage });
-                    setCropImageSrc(null);
                   } catch (e) {
-                    console.error(e);
-                    showToast('error', 'Gagal', 'Gagal memotong gambar');
+                    console.warn('Fallback ke foto asli karena kendala canvas browser', e);
+                    setNewMenu({ ...newMenu, image: cropImageSrc });
                   }
+                  setCropImageSrc(null);
                 }
               }}>
                 <Check size={16} className="mr-1" style={{ display: 'inline' }} />
