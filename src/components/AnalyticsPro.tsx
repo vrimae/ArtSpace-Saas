@@ -17,7 +17,7 @@ const formatShortCurrency = (val: number) => {
   return `Rp${val}`;
 };
 
-const COLORS = ['#EC4899', '#3B82F6', '#8B5CF6', '#F59E0B', '#0EA5E9'];
+const COLORS = ['#2563EB', '#38BDF8', '#8B5CF6', '#10B981', '#F59E0B'];
 
 type TimeFilter = 'today' | '7days' | 'month' | 'year';
 
@@ -475,8 +475,8 @@ const AnalyticsPro = () => {
                   strokeWidth={2}
                   animationDuration={1000}
                 >
-                  <Cell fill="#3B82F6" />
-                  <Cell fill="#EC4899" />
+                  <Cell fill="#10B981" />
+                  <Cell fill="#EF4444" />
                 </Pie>
                 <RechartsTooltip 
                   formatter={(value: any) => [formatCurrency(Number(value)), 'Total']}
@@ -488,10 +488,10 @@ const AnalyticsPro = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#3B82F6' }}></div> Pemasukan
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10B981' }}></div> Pemasukan
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#EC4899' }}></div> Pengeluaran
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#EF4444' }}></div> Pengeluaran
             </div>
           </div>
         </div>

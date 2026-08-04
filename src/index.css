@@ -14,34 +14,33 @@
    ========================================================================== */
 
 :root {
-  /* Clean White, Pink & Blue Palette */
-  --color-primary: #ec4899; 
+  /* Modern Dominant Blue & Clean White Palette */
+  --color-primary: #2563eb; 
   --color-primary-text: #ffffff; 
-  --color-primary-light: #f472b6;
-  --color-primary-lighter: rgba(236, 72, 153, 0.08);
-  --color-primary-dark: #db2777;
-  --color-primary-glow: rgba(236, 72, 153, 0.15);
+  --color-primary-light: #60a5fa;
+  --color-primary-lighter: rgba(37, 99, 235, 0.08);
+  --color-primary-dark: #1d4ed8;
+  --color-primary-glow: rgba(37, 99, 235, 0.18);
 
   --color-bg: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-alt: #f9fafb;
+  --color-surface-alt: #f8fafc;
 
-  --color-text: #1f2937;
-  --color-text-secondary: #4b5563;
-  --color-text-light: #9ca3af;
+  --color-text: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-light: #94a3b8;
 
-  --color-border: #e5e7eb;
-  --color-border-light: #f3f4f6;
+  --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
 
-  --color-income: #3b82f6;
-  --color-income-bg: rgba(59, 130, 246, 0.08);
-  --color-expense: #ec4899;
-  --color-expense-bg: rgba(236, 72, 153, 0.08);
+  --color-income: #10b981;
+  --color-income-bg: rgba(16, 185, 129, 0.08);
+  --color-expense: #ef4444;
+  --color-expense-bg: rgba(239, 68, 68, 0.08);
   --color-warning: #f59e0b;
   --color-warning-bg: rgba(245, 158, 11, 0.08);
   --color-info: #0ea5e9;
   --color-info-bg: rgba(14, 165, 233, 0.08);
-
   /* Shadows */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -63,32 +62,32 @@
 }
 
 [data-theme='dark'] {
-  --color-primary: #ec4899;
+  --color-primary: #3b82f6;
   --color-primary-text: #ffffff;
-  --color-primary-light: #f472b6;
-  --color-primary-lighter: rgba(236, 72, 153, 0.15);
-  --color-primary-dark: #db2777;
-  --color-primary-glow: rgba(236, 72, 153, 0.2);
+  --color-primary-light: #60a5fa;
+  --color-primary-lighter: rgba(59, 130, 246, 0.15);
+  --color-primary-dark: #2563eb;
+  --color-primary-glow: rgba(59, 130, 246, 0.25);
 
-  --color-bg: #111827;
-  --color-surface: #1f2937;
-  --color-surface-alt: #374151;
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-surface-alt: #334155;
 
-  --color-text: #f9fafb;
-  --color-text-secondary: #d1d5db;
-  --color-text-light: #9ca3af;
+  --color-text: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-light: #94a3b8;
 
-  --color-border: #374151;
-  --color-border-light: #1f2937;
+  --color-border: #334155;
+  --color-border-light: #1e293b;
 
-  --color-income: #3b82f6;
-  --color-income-bg: rgba(59, 130, 246, 0.1);
-  --color-expense: #ec4899;
-  --color-expense-bg: rgba(236, 72, 153, 0.1);
+  --color-income: #10b981;
+  --color-income-bg: rgba(16, 185, 129, 0.15);
+  --color-expense: #ef4444;
+  --color-expense-bg: rgba(239, 68, 68, 0.15);
   --color-warning: #f59e0b;
-  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-warning-bg: rgba(245, 158, 11, 0.15);
   --color-info: #0ea5e9;
-  --color-info-bg: rgba(14, 165, 233, 0.1);
+  --color-info-bg: rgba(14, 165, 233, 0.15);
 }
 
 /* Theme Adaptive Logo */

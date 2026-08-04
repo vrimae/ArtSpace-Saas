@@ -78,7 +78,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           <button 
             onClick={() => window.location.href = redirectPath}
             style={{ 
-              background: 'linear-gradient(135deg, #EC4899 0%, #3B82F6 100%)', 
+              background: 'linear-gradient(135deg, #1D4ED8 0%, #38BDF8 100%)', 
               color: '#fff', 
               padding: '0.85rem 1.75rem', 
               borderRadius: '12px', 
@@ -86,7 +86,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
               cursor: 'pointer', 
               fontWeight: '600',
               fontSize: '0.95rem',
-              boxShadow: '0 10px 15px -3px rgba(236, 72, 153, 0.3)',
+              boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.3)',
               transition: 'all 0.2s ease',
               display: 'flex',
               alignItems: 'center',
