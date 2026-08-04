@@ -62,7 +62,7 @@ const POS = () => {
   const [dynamicQRIS, setDynamicQRIS] = useState('');
   const [qrisString, setQrisString] = useState('');
   const [telegramConfig, setTelegramConfig] = useState({ token: '', chatId: '' });
-  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: 'SbmGAc1TxotP4TGuCGpS', url: '/api/fonnte/send', customTemplate: '', shopName: 'Vrimae' });
+  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: '/api/fonnte/send', customTemplate: '', shopName: 'Vrimae' });
   const [isActiveSubscription, setIsActiveSubscription] = useState(true);
   const [memberPurchaseCount, setMemberPurchaseCount] = useState<number | null>(null);
   const [checkingMember, setCheckingMember] = useState(false);
@@ -309,8 +309,10 @@ const POS = () => {
           token: user.user_metadata.telegram_bot_token || '',
           chatId: user.user_metadata.telegram_chat_id || ''
         });
+        const isSuperAdmin = user.email === 'bimdarmawa2@gmail.com' || user.email === 'vrimae23@gmail.com';
+        const defaultWaToken = isSuperAdmin ? 'SbmGAc1TxotP4TGuCGpS' : '';
         setWaGatewayConfig({
-          token: user.user_metadata.wa_gateway_token || 'SbmGAc1TxotP4TGuCGpS',
+          token: user.user_metadata.wa_gateway_token || defaultWaToken,
           url: (user.user_metadata?.wa_gateway_url && !user.user_metadata?.wa_gateway_url.includes('api.fonnte.com')) ? user.user_metadata?.wa_gateway_url : '/api/fonnte/send',
           customTemplate: user.user_metadata.wa_custom_template || '',
           shopName: user.user_metadata.shop_name || 'Vrimae'

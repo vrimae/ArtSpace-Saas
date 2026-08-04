@@ -58,11 +58,13 @@ const Settings = () => {
     telegramBotToken: '',
     telegramChatId: '',
     geminiApiKey: '',
-    waGatewayToken: 'SbmGAc1TxotP4TGuCGpS',
+    waGatewayToken: '',
     waGatewayUrl: '/api/fonnte/send',
     waTestPhone: '',
     waCustomTemplate: '',
   });
+
+  const [waDeviceStatus, setWaDeviceStatus] = useState<{ checked: boolean; loading: boolean; phone?: string; name?: string; status?: string; error?: string }>({ checked: false, loading: false });
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -83,6 +85,8 @@ const Settings = () => {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
+        const isSuperAdmin = user.email === 'bimdarmawa2@gmail.com' || user.email === 'vrimae23@gmail.com';
+        const defaultWaToken = isSuperAdmin ? 'SbmGAc1TxotP4TGuCGpS' : '';
         setFormData(prev => ({
           ...prev,
           email: user.email || '',
@@ -96,7 +100,7 @@ const Settings = () => {
           telegramBotToken: user.user_metadata?.telegram_bot_token || '',
           telegramChatId: user.user_metadata?.telegram_chat_id || '',
           geminiApiKey: user.user_metadata?.gemini_api_key || '',
-          waGatewayToken: user.user_metadata?.wa_gateway_token || 'SbmGAc1TxotP4TGuCGpS',
+          waGatewayToken: user.user_metadata?.wa_gateway_token || defaultWaToken,
           waGatewayUrl: (user.user_metadata?.wa_gateway_url && !user.user_metadata?.wa_gateway_url.includes('api.fonnte.com')) ? user.user_metadata?.wa_gateway_url : '/api/fonnte/send',
           waCustomTemplate: user.user_metadata?.wa_custom_template || '',
         }));
@@ -359,6 +363,37 @@ const Settings = () => {
     }
   };
 
+  const handleCheckWADevice = async () => {
+    if (!formData.waGatewayToken) {
+      showToast('error', 'Token Kosong', 'Silakan masukkan Token API dari Fonnte milik akun toko Anda terlebih dahulu.');
+      return;
+    }
+    setWaDeviceStatus({ checked: false, loading: true });
+    try {
+      const res = await fetch('/api/fonnte/device', {
+        method: 'POST',
+        headers: { 'Authorization': formData.waGatewayToken }
+      });
+      const data = await res.json();
+      if (data && data.status === true) {
+        setWaDeviceStatus({
+          checked: true,
+          loading: false,
+          phone: data.device,
+          name: data.name,
+          status: data.device_status
+        });
+        showToast('success', 'Nomor WA Terverifikasi!', `Terhubung ke nomor: +${data.device} (${data.name || 'Aktif'})`);
+      } else {
+        setWaDeviceStatus({ checked: true, loading: false, error: data.reason || 'Token tidak sah atau perangkat terputus.' });
+        showToast('error', 'Gagal Verifikasi', data.reason || 'Token tidak sah atau perangkat terputus.');
+      }
+    } catch (e: any) {
+      setWaDeviceStatus({ checked: true, loading: false, error: 'Gagal menghubungi server Fonnte.' });
+      showToast('error', 'Gagal', 'Gagal menghubungi server Fonnte.');
+    }
+  };
+
   const handleSavePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -591,20 +626,29 @@ const Settings = () => {
                   <MessageCircle size={15} style={{ color: '#22C55E' }} /> WhatsApp Gateway (Pesan Otomatis Tanpa Buka Tab)
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-                  Agar pesan struk & ucapan ke member dikirim <strong>100% otomatis di balik layar</strong> tanpa membuka aplikasi/tab WA di komputer/HP kasir, hubungkan <strong>Token API</strong> dari <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>Fonnte.com</a> (penyedia WhatsApp Bot populer di Indonesia) atau penyedia gateway lain.
+                  <strong>Setiap Akun Memiliki Nomor Pengirim Sendiri:</strong> Anda dapat menghubungkan nomor WhatsApp khusus untuk toko Anda dengan menaruh <strong>Token API Fonnte</strong> milik Anda. Setiap transaksi yang diselesaikan oleh kasir di akun ini akan otomatis dikirimkan dari nomor WhatsApp yang dihubungkan!
                 </p>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div className="form-group mb-0">
-                    <label className="form-label">Token API Fonnte / Gateway</label>
+                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <span>Token API Fonnte (Khusus Akun Ini)</span>
+                      <button 
+                        type="button" 
+                        onClick={handleCheckWADevice}
+                        style={{ border: 'none', background: 'none', color: 'var(--color-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                      >
+                        {waDeviceStatus.loading ? '⏳ Memeriksa...' : '🔍 Cek Nomor Aktif'}
+                      </button>
+                    </label>
                     <input 
-                      type="text" className="form-input" placeholder="Masukkan Token Rahasia Fonnte Anda..."
+                      type="text" className="form-input" placeholder="Masukkan Token Rahasia Fonnte Akun Anda..."
                       value={formData.waGatewayToken || ''} onChange={e => setFormData({...formData, waGatewayToken: e.target.value})} 
                       style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
                     />
                   </div>
                   <div className="form-group mb-0">
-                    <label className="form-label">URL Gateway API (Opsional)</label>
+                    <label className="form-label" style={{ marginBottom: '0.4rem' }}>URL Gateway API (Opsional)</label>
                     <input 
                       type="text" className="form-input" placeholder="/api/fonnte/send"
                       value={formData.waGatewayUrl || ''} onChange={e => setFormData({...formData, waGatewayUrl: e.target.value})} 
@@ -612,6 +656,16 @@ const Settings = () => {
                     />
                   </div>
                 </div>
+
+                {waDeviceStatus.checked && (
+                  <div style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: '10px', background: waDeviceStatus.error ? 'rgba(239, 68, 68, 0.08)' : 'rgba(34, 197, 94, 0.08)', border: `1px solid ${waDeviceStatus.error ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    {waDeviceStatus.error ? (
+                      <>❌ <span style={{ color: '#EF4444', fontWeight: 600 }}>Gagal Verifikasi Nomor: {waDeviceStatus.error}</span></>
+                    ) : (
+                      <>🟢 <span style={{ color: '#22C55E', fontWeight: 700 }}>Nomor WA Pengirim Akun Ini: +{waDeviceStatus.phone} ({waDeviceStatus.name}) • Status: Terhubung!</span></>
+                    )}
+                  </div>
+                )}
                 <div className="form-group mb-0" style={{ maxWidth: '350px' }}>
                   <label className="form-label">Uji Coba Kirim WA Tanpa Buka Tab</label>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
