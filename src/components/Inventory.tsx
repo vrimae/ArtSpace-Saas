@@ -18,10 +18,10 @@ const Inventory = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const { showToast } = useToast();
   const [customUnit, setCustomUnit] = useState('');
-  const standardUnits = ['gram', 'kg', 'ml', 'liter', 'pcs', 'pack', 'botol', 'sachet', 'dus'];
+  const standardUnits = ['pcs', 'unit', 'box', 'pack', 'set', 'meter', 'roll', 'gram', 'kg', 'ml', 'liter', 'botol', 'sachet', 'dus'];
   
   const [formData, setFormData] = useState({
-    name: '', category: 'Bubuk Matcha', quantity: '', unit: 'gram', unitPrice: '', date: new Date().toISOString().split('T')[0]
+    name: '', category: 'Barang / Produk Utama', quantity: '', unit: 'pcs', unitPrice: '', date: new Date().toISOString().split('T')[0]
   });
 
   const fetchData = async () => {
@@ -35,7 +35,7 @@ const Inventory = () => {
 
   const openAddModal = () => {
     setEditingId(null);
-    setFormData({ name: '', category: 'Bubuk Matcha', quantity: '', unit: 'gram', unitPrice: '', date: new Date().toISOString().split('T')[0] });
+    setFormData({ name: '', category: 'Barang / Produk Utama', quantity: '', unit: 'pcs', unitPrice: '', date: new Date().toISOString().split('T')[0] });
     setCustomUnit('');
     setIsModalOpen(true);
   };
@@ -44,7 +44,7 @@ const Inventory = () => {
     setEditingId(item.id);
     const isCustom = !standardUnits.includes(item.unit || '');
     setFormData({
-      name: item.name, category: item.category, quantity: item.quantity.toString(), unit: isCustom ? 'custom' : (item.unit || 'gram'), unitPrice: item.unitPrice.toString(), date: item.date
+      name: item.name, category: item.category, quantity: item.quantity.toString(), unit: isCustom ? 'custom' : (item.unit || 'pcs'), unitPrice: item.unitPrice.toString(), date: item.date
     });
     setCustomUnit(isCustom ? (item.unit || '') : '');
     setIsModalOpen(true);
@@ -111,10 +111,10 @@ const Inventory = () => {
   const executeExport = () => {
     if (!exportConfirm) return;
     if (exportConfirm.type === 'CSV') {
-      exportToCSV('inventori_matcha', inventory);
+      exportToCSV('laporan_inventori_toko', inventory);
       showToast('success', 'Export Berhasil', `${inventory.length} barang diekspor ke CSV`);
     } else {
-      exportToExcel('inventori_matcha', inventory);
+      exportToExcel('laporan_inventori_toko', inventory);
       showToast('success', 'Export Berhasil', `${inventory.length} barang diekspor ke Excel`);
     }
     setExportConfirm(null);
@@ -197,10 +197,10 @@ const Inventory = () => {
               <div className="form-group">
                 <label className="form-label">Kategori</label>
                 <select className="form-select" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-                  <option value="Bubuk Matcha">Bubuk Matcha</option>
-                  <option value="Packaging">Packaging (Gelas, Sedotan)</option>
-                  <option value="Susu/Pemanis">Susu / Pemanis</option>
-                  <option value="Peralatan">Peralatan (Whisk, dll)</option>
+                  <option value="Barang / Produk Utama">Barang / Produk Utama</option>
+                  <option value="Bahan Baku / Material">Bahan Baku / Material</option>
+                  <option value="Kemasan / Packaging">Kemasan / Packaging</option>
+                  <option value="Peralatan & Perlengkapan">Peralatan & Perlengkapan</option>
                   <option value="Lainnya">Lainnya</option>
                 </select>
               </div>
@@ -215,12 +215,17 @@ const Inventory = () => {
                 <div className="form-group">
                   <label className="form-label">Satuan</label>
                   <select className="form-select" value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})}>
+                    <option value="pcs">Pcs (buah)</option>
+                    <option value="unit">Unit</option>
+                    <option value="box">Box / Kotak</option>
+                    <option value="pack">Pack / Paket</option>
+                    <option value="set">Set</option>
+                    <option value="meter">Meter (m)</option>
+                    <option value="roll">Roll</option>
                     <option value="gram">Gram (g)</option>
                     <option value="kg">Kilogram (kg)</option>
                     <option value="ml">Mililiter (ml)</option>
                     <option value="liter">Liter (L)</option>
-                    <option value="pcs">Pcs (buah)</option>
-                    <option value="pack">Pack</option>
                     <option value="botol">Botol</option>
                     <option value="sachet">Sachet</option>
                     <option value="dus">Dus</option>

@@ -125,7 +125,7 @@ export const exportToExcelAdvanced = (
   // SHEET 2: Analisis Menu
   // ═══════════════════════════════════════════════════
   const menuRows = menuRanking.map(([name, data], idx) => {
-    const catLabel = data.category === 'water_based' ? 'Water Based' : data.category === 'milk_based' ? 'Milk Based' : 'Lainnya';
+    const catLabel = data.category || 'Umum';
     const pct = totalSold > 0 ? ((data.qty / totalSold) * 100).toFixed(1) + '%' : '0%';
     return [idx + 1, name, catLabel, data.qty, formatCurrency(data.revenue), pct];
   });
@@ -135,7 +135,7 @@ export const exportToExcelAdvanced = (
   // Data for Pie Chart (Category Sales)
   const catSales: Record<string, { qty: number; revenue: number }> = {};
   menuRanking.forEach(([, data]) => {
-    const catLabel = data.category === 'water_based' ? 'Water Based' : data.category === 'milk_based' ? 'Milk Based' : 'Lainnya';
+    const catLabel = data.category || 'Umum';
     if (!catSales[catLabel]) catSales[catLabel] = { qty: 0, revenue: 0 };
     catSales[catLabel].qty += data.qty;
     catSales[catLabel].revenue += data.revenue;

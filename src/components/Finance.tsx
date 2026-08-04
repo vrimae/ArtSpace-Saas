@@ -171,9 +171,7 @@ const Finance = () => {
     const categoriesFound = new Set<string>();
     products.forEach(p => {
       if (detailMenu.includes(p.name)) {
-        const cat = p.category === 'water_based' ? 'Water Based' 
-                  : p.category === 'milk_based' ? 'Milk Based' 
-                  : 'Lainnya';
+        const cat = p.category || 'Umum';
         categoriesFound.add(cat);
       }
     });

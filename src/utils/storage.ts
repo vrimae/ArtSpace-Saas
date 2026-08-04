@@ -326,7 +326,7 @@ export const getProducts = async (): Promise<Product[]> => {
     .order('created_at', { ascending: false });
   if (error) { console.error('getProducts error:', error); return []; }
   
-  return (data || []).map(row => ({ id: row.id, name: row.name, price: Number(row.price), image: row.image, category: row.category || 'water_based' }));
+  return (data || []).map(row => ({ id: row.id, name: row.name, price: Number(row.price), image: row.image, category: row.category || 'Umum' }));
 };
 
 export const addProduct = async (p: Omit<Product, 'id'>, actorName?: string, reason?: string): Promise<{ error: any }> => {
@@ -338,7 +338,7 @@ export const addProduct = async (p: Omit<Product, 'id'>, actorName?: string, rea
     name: p.name,
     price: p.price,
     image: p.image,
-    category: p.category || 'water_based',
+    category: p.category || 'Umum',
     user_id: user.id,
   }]);
 
@@ -394,7 +394,7 @@ export const getCategories = async (): Promise<string[]> => {
   if (user.user_metadata?.product_categories) {
     return user.user_metadata.product_categories;
   }
-  return [];
+  return ['Umum'];
 };
 
 export const getAddOns = async (): Promise<any[]> => {
@@ -413,7 +413,7 @@ export const saveAddOns = async (addons: any[], actorName?: string, reason?: str
     data: { addons }
   });
   if (error) { handleApiError('', error); throw error; }
-  logActivity('UPDATE_ADDONS', `Memperbarui daftar resep/Add-ons (${addons.length} item)`, actorName, reason);
+  logActivity('UPDATE_ADDONS', `Memperbarui daftar opsi / Add-ons (${addons.length} item)`, actorName, reason);
 };
 
 export const saveCategories = async (categories: string[], actorName?: string, reason?: string) => {

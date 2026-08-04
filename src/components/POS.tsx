@@ -598,7 +598,7 @@ const POS = () => {
       const menuName = newMenu.name;
       const price = parseFloat(newMenu.price);
       const category = newMenu.category;
-      const image = newMenu.image || '/images/hot_matcha.png';
+      const image = newMenu.image || '/default-item.svg';
 
       if (editingMenuId) {
         try {
@@ -1182,7 +1182,7 @@ const POS = () => {
             </div>
 
             <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>Menu Tambahan (Add-on)</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>Opsi Tambahan / Varian (Add-on)</div>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', position: 'relative' }}>
                 <div 
                   className="form-select" 
@@ -1392,7 +1392,7 @@ const POS = () => {
                     <div className="form-group">
                       <label className="form-label flex items-center gap-1"><ImageIcon size={14} /> Foto Menu (Opsional)</label>
                       <div className="flex items-center gap-4">
-                        {newMenu.image && newMenu.image !== '/images/hot_matcha.png' ? (
+                        {newMenu.image && newMenu.image !== '/images/hot_matcha.png' && newMenu.image !== '/default-item.svg' ? (
                           <div style={{ position: 'relative', width: '60px', height: '60px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
                             <img src={newMenu.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             <button
