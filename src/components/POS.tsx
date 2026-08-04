@@ -4,7 +4,7 @@ import { ShoppingCart, Check, Trash2, Plus, Minus, Settings, Image as ImageIcon,
 import { QRCodeSVG } from 'qrcode.react';
 import Receipt from './Receipt';
 import type { Product, ProductCategory, ExtraItem } from '../types';
-import { getProducts, addProduct, deleteProduct, addTransaction, updateProduct, getCategories, deductInventory, getInventory, getAddOns, saveAddOns, checkIsActiveSubscription } from '../utils/storage';
+import { getProducts, addProduct, deleteProduct, addTransaction, updateProduct, getCategories, deductInventory, getInventory, getAddOns, saveAddOns, checkIsActiveSubscription, getUser } from '../utils/storage';
 import { generateDynamicQRIS } from '../utils/qris';
 import { useToast } from './Toast';
 import { formatCurrencyInput } from '../utils/currencyInput';
@@ -302,7 +302,7 @@ const POS = () => {
       setNewMenu(prev => ({ ...prev, category: prev.category || cats[0] || '' }));
     });
     fetchInventoryAndRecipes();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getUser().then((user: any) => {
       if (user?.user_metadata) {
         if (user.user_metadata.qris_string) {
           setQrisString(user.user_metadata.qris_string);

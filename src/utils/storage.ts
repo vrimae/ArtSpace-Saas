@@ -1,5 +1,6 @@
 import type { Transaction, InventoryItem, Product, ExtraItem, ActivityLog } from '../types';
 import { supabase } from '../lib/supabase';
+import { compressImage } from './cropImage';
 
 const handleApiError = (context: string, error: any) => {
   console.error(`${context}`, error);
@@ -8,23 +9,27 @@ const handleApiError = (context: string, error: any) => {
   }
 };
 
-// ================= CACHED USER =================
-// Cache the user object to avoid repeated auth calls within the same session.
-// The cache is invalidated on auth state changes (login/logout).
+// ================= CACHED USER (WITH HIGH-PERFORMANCE TTL) =================
 let cachedUser: any = null;
+let lastCacheTime = 0;
 let userPromise: Promise<any> | null = null;
+const CACHE_TTL = 45 * 1000; // 45 seconds TTL to eliminate repeated network delay (anti-lag)
 
-const getUser = async () => {
-  if (cachedUser) return cachedUser;
-  // Deduplicate concurrent calls
+export const getUser = async (forceRefresh = false) => {
+  const now = Date.now();
+  if (!forceRefresh && cachedUser && (now - lastCacheTime < CACHE_TTL)) {
+    return cachedUser;
+  }
   if (userPromise) return userPromise;
+
   userPromise = supabase.auth.getUser().then(({ data: { user } }) => {
     cachedUser = user;
+    lastCacheTime = Date.now();
     userPromise = null;
     return user;
   }).catch(() => {
     userPromise = null;
-    return null;
+    return cachedUser || null;
   });
   return userPromise;
 };
@@ -32,21 +37,17 @@ const getUser = async () => {
 // Clear cache on auth state change
 supabase.auth.onAuthStateChange(() => {
   cachedUser = null;
+  lastCacheTime = 0;
   userPromise = null;
 });
 
 const checkActiveUser = async () => {
-  // Always fetch fresh user data from Supabase (bypass cache)
-  // so that admin changes via SQL Editor take effect immediately
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) {
+  // Gunakan cached user jika masih dalam window TTL 45 detik agar sistem ringan & anti-lag
+  const user = await getUser(false);
+  if (!user) {
     window.dispatchEvent(new CustomEvent('auth_expired_error', { detail: 'Maaf akun anda telah expired' }));
     throw new Error('Sesi tidak valid atau akun dinonaktifkan');
   }
-  
-  // Update cache with fresh data
-  cachedUser = user;
-  
   return user;
 };
 
@@ -327,14 +328,30 @@ export const getProducts = async (): Promise<Product[]> => {
   if (error) { console.error('getProducts error:', error); return []; }
   
   const recipesMap = (user.user_metadata?.product_recipes || {}) as Record<string, any[]>;
-  return (data || []).map(row => ({ 
-    id: row.id, 
-    name: row.name, 
-    price: Number(row.price), 
-    image: row.image, 
-    category: row.category || 'Umum',
-    recipes: recipesMap[row.id] || []
-  }));
+  return (data || []).map(row => {
+    let img = row.image;
+    // Auto-clean Optimizer: Jika terdapat gambar berukuran besar di database (>80KB),
+    // lakukan kompresi latar belakang secara otomatis agar loading web selalu cepat & bebas lag!
+    if (img && typeof img === 'string' && img.startsWith('data:image/') && img.length > 80000) {
+      setTimeout(async () => {
+        try {
+          const cleaned = await compressImage(img, 450, 0.75);
+          if (cleaned && cleaned.length < img.length) {
+            await supabase.from('products').update({ image: cleaned }).eq('id', row.id);
+          }
+        } catch (e) { /* silent fail for background optimization */ }
+      }, 500);
+    }
+
+    return { 
+      id: row.id, 
+      name: row.name, 
+      price: Number(row.price), 
+      image: img, 
+      category: row.category || 'Umum',
+      recipes: recipesMap[row.id] || []
+    };
+  });
 };
 
 export const addProduct = async (p: Omit<Product, 'id'>, actorName?: string, reason?: string): Promise<{ error: any }> => {

@@ -385,11 +385,11 @@ const App = () => {
         setIsAdmin(true);
       }
 
-      setTimeout(() => setLoading(false), 1500);
+      setTimeout(() => setLoading(false), 200);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
-      if (session?.user) {
+      if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (user && !error) {
           session.user = user;
