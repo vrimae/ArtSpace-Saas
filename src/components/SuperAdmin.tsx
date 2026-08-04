@@ -85,11 +85,8 @@ const SuperAdmin: React.FC = () => {
          newAiDate = futureStr;
        }
     } else if (currentDuration === 0) {
-       // Jika durasi tidak diubah, tapi tier diturunkan
-       if (editTier === 'biasa') {
-         newAnalyticsDate = null;
-         newAiDate = null;
-       } else if (editTier === 'analytics_pro') {
+       // Jika durasi tidak diubah, tapi tier diturunkan ke analytics_pro
+       if (editTier === 'analytics_pro') {
          newAiDate = null;
        }
     }
