@@ -41,7 +41,9 @@ const POS = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
-  const [newMenu, setNewMenu] = useState({ name: '', price: '', image: '', category: '' });
+  const [newMenu, setNewMenu] = useState({ name: '', price: '', image: '', category: '', recipes: [] as { inventoryId: string; quantity: number; name?: string; unit?: string }[] });
+  const [selectedRecipeInvId, setSelectedRecipeInvId] = useState('');
+  const [selectedRecipeQty, setSelectedRecipeQty] = useState('1');
   
   // Crop state
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
@@ -599,10 +601,11 @@ const POS = () => {
       const price = parseFloat(newMenu.price);
       const category = newMenu.category;
       const image = newMenu.image || '/default-item.svg';
+      const recipes = newMenu.recipes || [];
 
       if (editingMenuId) {
         try {
-          await updateProduct(editingMenuId, { name: menuName, price, image, category }, "Admin", "Update Menu");
+          await updateProduct(editingMenuId, { name: menuName, price, image, category, recipes }, "Admin", "Update Menu");
           showToast('success', 'Menu Diperbarui', `"${menuName}" berhasil diperbarui`);
           setEditingMenuId(null);
         } catch (error: any) {
@@ -610,7 +613,7 @@ const POS = () => {
           return;
         }
       } else {
-        const result = await addProduct({ name: menuName, price, image, category }, "Admin", "Tambah Menu");
+        const result = await addProduct({ name: menuName, price, image, category, recipes }, "Admin", "Tambah Menu");
         if (result?.error) {
           showToast('error', 'Gagal Menambahkan Menu', String(result.error?.message || result.error));
           return;
@@ -618,7 +621,9 @@ const POS = () => {
         showToast('success', 'Menu Ditambahkan', `"${menuName}" berhasil masuk etalase`);
       }
       
-      setNewMenu({ name: '', price: '', image: '', category: categories[0] || '' });
+      setNewMenu({ name: '', price: '', image: '', category: categories[0] || '', recipes: [] });
+      setSelectedRecipeInvId('');
+      setSelectedRecipeQty('1');
       setIsMenuModalOpen(false);
       await fetchProducts();
     } finally {
@@ -1419,6 +1424,89 @@ const POS = () => {
                       </div>
                     </div>
 
+                    <div className="form-group" style={{ marginTop: '1.25rem', borderTop: '1px solid var(--color-border-light)', paddingTop: '1rem' }}>
+                      <label className="form-label flex items-center gap-1" style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+                        📦 Resep / Bahan Inventori Terhubung (Otomatis Kurang Stok)
+                      </label>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
+                        Pilih bahan dari inventori yang terpakai setiap kali menu ini terjual (misal: kemasan, bumbu, atau bahan dasar).
+                      </p>
+
+                      <div className="flex gap-2 mb-3 items-center">
+                        <select
+                          className="form-select"
+                          style={{ flex: 2, fontSize: '0.85rem' }}
+                          value={selectedRecipeInvId}
+                          onChange={e => setSelectedRecipeInvId(e.target.value)}
+                        >
+                          <option value="">-- Pilih Bahan dari Inventori --</option>
+                          {inventory.map(inv => (
+                            <option key={inv.id} value={inv.id}>{inv.name} (Stok: {inv.quantity} {inv.unit || 'pcs'})</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0.1"
+                          step="any"
+                          placeholder="Jml"
+                          className="form-input"
+                          style={{ width: '80px', fontSize: '0.85rem' }}
+                          value={selectedRecipeQty}
+                          onChange={e => setSelectedRecipeQty(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ padding: '0.55rem 0.75rem', fontSize: '0.85rem', borderColor: 'var(--color-primary)', color: 'var(--color-primary)', fontWeight: 600 }}
+                          onClick={() => {
+                            if (!selectedRecipeInvId || !selectedRecipeQty || Number(selectedRecipeQty) <= 0) return;
+                            const invItem = inventory.find(i => i.id === selectedRecipeInvId);
+                            if (!invItem) return;
+                            const exists = (newMenu.recipes || []).some(r => r.inventoryId === selectedRecipeInvId);
+                            if (exists) {
+                              setNewMenu({
+                                ...newMenu,
+                                recipes: (newMenu.recipes || []).map(r => r.inventoryId === selectedRecipeInvId ? { ...r, quantity: Number(selectedRecipeQty), name: invItem.name, unit: invItem.unit || 'pcs' } : r)
+                              });
+                            } else {
+                              setNewMenu({
+                                ...newMenu,
+                                recipes: [...(newMenu.recipes || []), { inventoryId: selectedRecipeInvId, quantity: Number(selectedRecipeQty), name: invItem.name, unit: invItem.unit || 'pcs' }]
+                              });
+                            }
+                            setSelectedRecipeInvId('');
+                            setSelectedRecipeQty('1');
+                          }}
+                        >
+                          + Hubungkan
+                        </button>
+                      </div>
+
+                      {newMenu.recipes && newMenu.recipes.length > 0 && (
+                        <div style={{ background: 'var(--color-surface-alt)', borderRadius: 'var(--radius-md)', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', border: '1px solid var(--color-border-light)' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>Bahan terikat dengan menu ini:</div>
+                          {newMenu.recipes.map((r, i) => {
+                            const invItem = inventory.find(inv => inv.id === r.inventoryId);
+                            const name = r.name || invItem?.name || 'Bahan Inventori';
+                            const unit = r.unit || invItem?.unit || 'pcs';
+                            return (
+                              <div key={r.inventoryId || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', border: '1px solid var(--color-border)' }}>
+                                <span><strong>{name}</strong> : terpakai <strong>{r.quantity} {unit}</strong> / pcs menu</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setNewMenu({ ...newMenu, recipes: (newMenu.recipes || []).filter(item => item.inventoryId !== r.inventoryId) })}
+                                  style={{ color: 'var(--color-expense)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 4px', fontWeight: 'bold' }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex justify-end" style={{ marginTop: '1rem' }}>
                       <div className="flex gap-2">
                         <button type="submit" className="btn btn-primary flex-1 btn-add-menu" disabled={isSubmitting || !isActiveSubscription} title={!isActiveSubscription ? 'Terkunci karena masa trial habis' : ''}>
@@ -1428,7 +1516,9 @@ const POS = () => {
                         {editingMenuId && (
                           <button type="button" className="btn btn-outline" onClick={() => {
                             setEditingMenuId(null);
-                            setNewMenu({ name: '', price: '', image: '', category: categories[0] || '' });
+                            setNewMenu({ name: '', price: '', image: '', category: categories[0] || '', recipes: [] });
+                            setSelectedRecipeInvId('');
+                            setSelectedRecipeQty('1');
                           }} disabled={isSubmitting}>
                             Batal
                           </button>
@@ -1514,7 +1604,9 @@ const POS = () => {
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                     <button className="btn-icon" disabled={!isActiveSubscription} onClick={() => {
                                       setEditingMenuId(p.id);
-                                      setNewMenu({ name: p.name, price: p.price.toString(), image: p.image, category: p.category || categories[0] || '' });
+                                      setNewMenu({ name: p.name, price: p.price.toString(), image: p.image, category: p.category || categories[0] || '', recipes: p.recipes || [] });
+                                      setSelectedRecipeInvId('');
+                                      setSelectedRecipeQty('1');
                                       setActionReason({ name: '', reason: '' });
                                       window.scrollTo({ top: 0, behavior: 'smooth' });
                                     }} style={{ color: isActiveSubscription ? 'var(--color-primary)' : 'var(--color-text-light)', flexShrink: 0, padding: '0.25rem', opacity: isActiveSubscription ? 1 : 0.5 }} title="Edit">

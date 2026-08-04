@@ -326,39 +326,58 @@ export const getProducts = async (): Promise<Product[]> => {
     .order('created_at', { ascending: false });
   if (error) { console.error('getProducts error:', error); return []; }
   
-  return (data || []).map(row => ({ id: row.id, name: row.name, price: Number(row.price), image: row.image, category: row.category || 'Umum' }));
+  const recipesMap = (user.user_metadata?.product_recipes || {}) as Record<string, any[]>;
+  return (data || []).map(row => ({ 
+    id: row.id, 
+    name: row.name, 
+    price: Number(row.price), 
+    image: row.image, 
+    category: row.category || 'Umum',
+    recipes: recipesMap[row.id] || []
+  }));
 };
 
 export const addProduct = async (p: Omit<Product, 'id'>, actorName?: string, reason?: string): Promise<{ error: any }> => {
   const user = await checkActiveUser();
   if (!user) return { error: 'User not authenticated' };
 
+  let newId: string | null = null;
   // Try with category first
-  const { error } = await supabase.from('products').insert([{
+  const { data: inserted, error } = await supabase.from('products').insert([{
     name: p.name,
     price: p.price,
     image: p.image,
     category: p.category || 'Umum',
     user_id: user.id,
-  }]);
+  }]).select('id');
 
   if (error) {
     // If category column doesn't exist, try without it
     if (error.code === '42703' || error.message?.includes('category')) {
-      const { error: error2 } = await supabase.from('products').insert([{
+      const { data: inserted2, error: error2 } = await supabase.from('products').insert([{
         name: p.name,
         price: p.price,
         image: p.image,
         user_id: user.id,
-      }]);
+      }]).select('id');
       if (error2) { console.error('addProduct error:', error2); return { error: error2 }; }
+      newId = inserted2?.[0]?.id || null;
       logActivity('ADD_PRODUCT', `Menambahkan menu baru: ${p.name} (Kategori: default)`, actorName, reason);
-      return { error: null };
+    } else {
+      console.error('addProduct error:', error);
+      return { error };
     }
-    console.error('addProduct error:', error);
-    return { error };
+  } else {
+    newId = inserted?.[0]?.id || null;
+    logActivity('ADD_PRODUCT', `Menambahkan menu baru: ${p.name} (Kategori: ${p.category})`, actorName, reason);
   }
-  logActivity('ADD_PRODUCT', `Menambahkan menu baru: ${p.name} (Kategori: ${p.category})`, actorName, reason);
+
+  if (newId && p.recipes && p.recipes.length > 0) {
+    const currentRecipes = { ...(user.user_metadata?.product_recipes || {}) };
+    currentRecipes[newId] = p.recipes;
+    await supabase.auth.updateUser({ data: { product_recipes: currentRecipes } });
+  }
+
   return { error: null };
 };
 
@@ -368,6 +387,12 @@ export const deleteProduct = async (id: string, actorName?: string, reason?: str
   const { error } = await supabase.from('products').delete().eq('id', id);
   if (error) { handleApiError('', error); throw error; }
   logActivity('DELETE_PRODUCT', `Menghapus menu: ${prod?.name || 'Tidak diketahui'}`, actorName, reason);
+
+  const currentRecipes = { ...(user.user_metadata?.product_recipes || {}) };
+  if (currentRecipes[id]) {
+    delete currentRecipes[id];
+    await supabase.auth.updateUser({ data: { product_recipes: currentRecipes } });
+  }
 };
 
 export const updateProduct = async (id: string, p: Partial<Product>, actorName?: string, reason?: string) => {
@@ -381,6 +406,12 @@ export const updateProduct = async (id: string, p: Partial<Product>, actorName?:
   const { error } = await supabase.from('products').update(payload).eq('id', id);
   if (error) { handleApiError('', error); throw error; }
   logActivity('UPDATE_PRODUCT', `Memperbarui menu: ${p.name || prod?.name || 'Tidak diketahui'}`, actorName, reason);
+
+  if (p.recipes !== undefined) {
+    const currentRecipes = { ...(user.user_metadata?.product_recipes || {}) };
+    currentRecipes[id] = p.recipes;
+    await supabase.auth.updateUser({ data: { product_recipes: currentRecipes } });
+  }
 };
 
 export const initStorage = () => {
@@ -440,17 +471,28 @@ export const renameCategoryInItems = async (oldName: string, newName: string) =>
 };
 
 // ================= RECIPES =================
-export const deductInventory = async (cartItems: { quantity: number, extras: ExtraItem[] }[]) => {
+export const deductInventory = async (cartItems: { quantity: number; extras?: ExtraItem[]; product?: Product }[]) => {
   const user = await getUser();
   if (!user) return;
   
-  // Aggregate required inventory items based on extras in the cart
+  const recipesMap = (user.user_metadata?.product_recipes || {}) as Record<string, { inventoryId: string; quantity: number }[]>;
   const inventoryUsage: Record<string, number> = {};
+
   for (const item of cartItems) {
+    // 1. Deduct from product recipes / BOM linked to inventory
+    const productRecipes = item.product?.recipes || (item.product?.id ? recipesMap[item.product.id] : undefined);
+    if (productRecipes && Array.isArray(productRecipes)) {
+      for (const recipe of productRecipes) {
+        if (!inventoryUsage[recipe.inventoryId]) inventoryUsage[recipe.inventoryId] = 0;
+        inventoryUsage[recipe.inventoryId] += (Number(recipe.quantity) * item.quantity);
+      }
+    }
+
+    // 2. Deduct from order-specific extras selected during checkout
     if (item.extras && Array.isArray(item.extras)) {
       for (const extra of item.extras) {
         if (!inventoryUsage[extra.inventoryId]) inventoryUsage[extra.inventoryId] = 0;
-        inventoryUsage[extra.inventoryId] += (extra.quantity * item.quantity);
+        inventoryUsage[extra.inventoryId] += (Number(extra.quantity) * item.quantity);
       }
     }
   }
@@ -470,7 +512,7 @@ export const deductInventory = async (cartItems: { quantity: number, extras: Ext
       currentInventory.map(inv => {
         const used = inventoryUsage[inv.id];
         if (used) {
-          const newQty = inv.quantity - used;
+          const newQty = Math.max(0, Number(inv.quantity) - used);
           return supabase.from('inventory').update({ quantity: newQty }).eq('id', inv.id);
         }
         return Promise.resolve();

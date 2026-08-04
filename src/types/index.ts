@@ -22,12 +22,20 @@ export interface InventoryItem {
 
 export type ProductCategory = string;
 
+export interface ProductRecipe {
+  inventoryId: string;
+  quantity: number;
+  name?: string;
+  unit?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
   price: number;
   image: string;
   category: ProductCategory;
+  recipes?: ProductRecipe[];
 }
 
 export interface ExtraItem {
