@@ -85,9 +85,16 @@ const POS = () => {
     const timer = setTimeout(async () => {
       setCheckingMember(true);
       try {
+        const user = await getUser();
+        if (!user) {
+          setMemberPurchaseCount(0);
+          setCheckingMember(false);
+          return;
+        }
         const { count, error } = await supabase
           .from('transactions')
           .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
           .ilike('description', `%[WA: %${corePhone}%]%`);
         
         if (!error) {
