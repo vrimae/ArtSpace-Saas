@@ -14,10 +14,10 @@
    ========================================================================== */
 
 :root {
-  /* Modern Dominant Blue & Clean White Palette */
+  /* Modern Dominant Blue with a Touch of Pink Palette */
   --color-primary: #2563eb; 
   --color-primary-text: #ffffff; 
-  --color-primary-light: #60a5fa;
+  --color-primary-light: #ec4899;
   --color-primary-lighter: rgba(37, 99, 235, 0.08);
   --color-primary-dark: #1d4ed8;
   --color-primary-glow: rgba(37, 99, 235, 0.18);
@@ -64,7 +64,7 @@
 [data-theme='dark'] {
   --color-primary: #3b82f6;
   --color-primary-text: #ffffff;
-  --color-primary-light: #60a5fa;
+  --color-primary-light: #f472b6;
   --color-primary-lighter: rgba(59, 130, 246, 0.15);
   --color-primary-dark: #2563eb;
   --color-primary-glow: rgba(59, 130, 246, 0.25);
@@ -386,14 +386,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-primary {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary) 70%, var(--color-primary-light) 100%);
   color: var(--color-primary-text);
-  box-shadow: 0 4px 14px var(--color-primary-lighter);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
 }
 
 .btn-primary:hover {
-  background: var(--color-primary-dark);
-  box-shadow: 0 6px 20px var(--color-primary-lighter);
+  background: linear-gradient(135deg, var(--color-primary-dark) 50%, var(--color-primary-light) 100%);
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.35);
   transform: translateY(-2px);
 }
 
