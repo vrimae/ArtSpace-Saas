@@ -1104,7 +1104,7 @@ const POS = () => {
                   </div>
                   <input
                     type="text"
-                    placeholder="Nama Member / Pelanggan (Contoh: Kak Budi)"
+                    placeholder="Nama Member / Pelanggan"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     style={{
@@ -1123,7 +1123,7 @@ const POS = () => {
                   />
                   <input
                     type="tel"
-                    placeholder="No. WhatsApp Member (Contoh: 081234567890)"
+                    placeholder="No. WhatsApp (08xxxxxxxxx)"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     style={{
