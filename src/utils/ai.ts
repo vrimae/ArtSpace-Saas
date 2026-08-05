@@ -1,5 +1,6 @@
-import { GoogleGenerativeAI, FunctionDeclaration, SchemaType } from '@google/generative-ai';
-import type { Transaction, InventoryItem, Product } from '../types';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import type { FunctionDeclaration } from '@google/generative-ai';
+import type { Transaction, InventoryItem } from '../types';
 import { getTransactions, getInventory, getProducts } from './storage';
 
 // 1. DEFINISI TOOLS / FUNCTION CALLING YANG AMAN & KETAT (READ-ONLY)
