@@ -29,6 +29,7 @@ const Finance = () => {
     amount: '',
     category: 'Supply',
     description: '',
+    paymentMethod: 'Tunai',
     date: format(new Date(), 'yyyy-MM-dd')
   });
 
@@ -62,7 +63,7 @@ const Finance = () => {
 
   const openAddModal = () => {
     setEditingId(null);
-    setFormData({ type: 'expense', amount: '', category: 'Supply', description: '', date: format(new Date(), 'yyyy-MM-dd') });
+    setFormData({ type: 'expense', amount: '', category: 'Supply', description: '', paymentMethod: 'Tunai', date: format(new Date(), 'yyyy-MM-dd') });
     setIsModalOpen(true);
   };
 
@@ -70,7 +71,16 @@ const Finance = () => {
     setEditingId(t.id);
     let dateStr = t.date;
     try { dateStr = format(new Date(t.date), 'yyyy-MM-dd'); } catch(e) { /* ignore */ }
-    setFormData({ type: t.type, amount: t.amount.toString(), category: t.category, description: t.description, date: dateStr });
+    
+    let currentDesc = t.description;
+    let currentMethod = 'Tunai';
+    const match = currentDesc.match(/^\[(.*?)\]\s/);
+    if (match) {
+      currentMethod = match[1];
+      currentDesc = currentDesc.replace(match[0], '').trim();
+    }
+
+    setFormData({ type: t.type, amount: t.amount.toString(), category: t.category, description: currentDesc, paymentMethod: currentMethod, date: dateStr });
     setIsModalOpen(true);
   };
 
@@ -91,13 +101,14 @@ const Finance = () => {
     }
 
     setIsSubmitting(true);
+    const finalDesc = formData.paymentMethod ? `[${formData.paymentMethod}] ${formData.description.trim()}` : formData.description.trim();
     try {
       if (editingId) {
         await updateTransaction(editingId, { 
           type: formData.type as 'income' | 'expense', 
           amount: parseFloat(formData.amount), 
           category: formData.category, 
-          description: formData.description, 
+          description: finalDesc, 
           date: formData.date 
         }, actionName, actionReason);
         showToast('success', 'Transaksi Diperbarui', 'Perubahan berhasil disimpan');
@@ -106,7 +117,7 @@ const Finance = () => {
           type: formData.type as 'income' | 'expense',
           amount: parseFloat(formData.amount),
           category: formData.category,
-          description: formData.description,
+          description: finalDesc,
           date: formData.date
         });
         showToast('success', 'Transaksi Tersimpan', 'Transaksi berhasil dicatat');
@@ -327,6 +338,18 @@ const Finance = () => {
                 <select className="form-select" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
                   <option value="income">Pemasukan</option>
                   <option value="expense">Pengeluaran</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Metode Pembayaran</label>
+                <select className="form-select" value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})}>
+                  <option value="Tunai">Tunai (Cash)</option>
+                  <option value="Transfer Bank">Transfer Bank / M-Banking</option>
+                  <option value="QRIS">QRIS</option>
+                  <option value="DANA">DANA</option>
+                  <option value="GoPay">GoPay</option>
+                  <option value="Kartu Debit/Kredit">Kartu Debit / Kredit</option>
+                  <option value="Lainnya">Lainnya</option>
                 </select>
               </div>
               <div className="form-group">
