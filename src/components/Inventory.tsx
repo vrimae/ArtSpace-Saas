@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { getInventory, addInventory, updateInventory, deleteInventory, addTransaction } from '../utils/storage';
 import { exportToCSV, exportToExcel } from '../utils/export';
 import type { InventoryItem } from '../types';
-import { format } from 'date-fns';
 import { Plus, Download, Pencil, Trash2, Calendar, X } from 'lucide-react';
 import { useToast } from './Toast';
 import { safeFormatDate } from '../utils/format';
