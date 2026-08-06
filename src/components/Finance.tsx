@@ -6,6 +6,7 @@ import { format, isThisWeek, isThisMonth } from 'date-fns';
 import { Plus, Download, Pencil, Trash2, Calendar, X } from 'lucide-react';
 import { useToast } from './Toast';
 import { formatCurrencyInput } from '../utils/currencyInput';
+import { safeParseDate, safeFormatDate } from '../utils/format';
 
 const Finance = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -69,10 +70,10 @@ const Finance = () => {
 
   const openEditModal = (t: Transaction) => {
     setEditingId(t.id);
-    let dateStr = t.date;
-    try { dateStr = format(new Date(t.date), 'yyyy-MM-dd'); } catch(e) { /* ignore */ }
+    let dateStr = t?.date || '';
+    try { dateStr = safeFormatDate(t.date, 'yyyy-MM-dd'); } catch(e) { /* ignore */ }
     
-    let currentDesc = t.description;
+    let currentDesc = String(t?.description || '');
     let currentMethod = 'Tunai';
     const match = currentDesc.match(/^\[(.*?)\]\s/);
     if (match) {
@@ -80,7 +81,7 @@ const Finance = () => {
       currentDesc = currentDesc.replace(match[0], '').trim();
     }
 
-    setFormData({ type: t.type, amount: t.amount.toString(), category: t.category, description: currentDesc, paymentMethod: currentMethod, date: dateStr });
+    setFormData({ type: t.type, amount: String(t?.amount || '0'), category: t?.category || 'Supply', description: currentDesc, paymentMethod: currentMethod, date: dateStr });
     setIsModalOpen(true);
   };
 
@@ -150,9 +151,10 @@ const Finance = () => {
   };
 
   const filteredTransactions = useMemo(() => transactions.filter(t => {
-    if (dateSearch && !t.date.startsWith(dateSearch)) return false;
+    if (!t) return false;
+    if (dateSearch && !String(t?.date || '').startsWith(dateSearch)) return false;
     if (timeFilter === 'all') return true;
-    const date = new Date(t.date);
+    const date = safeParseDate(t?.date);
     if (timeFilter === 'week') return isThisWeek(date);
     if (timeFilter === 'month') return isThisMonth(date);
     return true;
@@ -160,7 +162,7 @@ const Finance = () => {
 
   const parseTransactionData = (t: Transaction) => {
     let namaPembeli = '-';
-    let detailMenu = t.description;
+    let detailMenu = String(t?.description || '');
     let kategoriMenu = '-';
     let paymentMethod = '-';
 
@@ -181,7 +183,7 @@ const Finance = () => {
 
     const categoriesFound = new Set<string>();
     products.forEach(p => {
-      if (detailMenu.includes(p.name)) {
+      if (p?.name && detailMenu.includes(p.name)) {
         const cat = p.category || 'Umum';
         categoriesFound.add(cat);
       }
@@ -236,8 +238,10 @@ const Finance = () => {
     setExportConfirm(null);
   };
 
-  const formatCurrency = (amount: number) => {
-    return 'Rp ' + amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const formatCurrency = (amount: any) => {
+    const val = Number(amount);
+    if (isNaN(val)) return 'Rp 0';
+    return 'Rp ' + val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
 
   return (
@@ -296,7 +300,7 @@ const Finance = () => {
                   const parsed = parseTransactionData(t);
                   return (
                   <tr key={t.id}>
-                    <td className="text-sm text-secondary">{format(new Date(t.date), 'dd MMM yyyy')}</td>
+                    <td className="text-sm text-secondary">{safeFormatDate(t.date, 'dd MMM yyyy')}</td>
                     <td><span className={`badge ${t.type === 'income' ? 'badge-income' : 'badge-expense'}`}>{t.type === 'income' ? 'Masuk' : 'Keluar'}</span></td>
                     <td className="text-sm">{parsed.paymentMethod !== '-' ? <span className="badge badge-neutral">{parsed.paymentMethod}</span> : <span className="text-muted">-</span>}</td>
                     <td className="text-sm"><span className="badge badge-neutral">{t.category}</span></td>

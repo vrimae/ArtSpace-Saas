@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { format } from 'date-fns';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, safeFormatDate } from '../utils/format';
 import { supabase } from '../lib/supabase';
 
 export default function Receipt({ transaction }: { transaction: any }) {
@@ -53,7 +52,7 @@ export default function Receipt({ transaction }: { transaction: any }) {
       <div className="receipt-divider">--------------------------------</div>
       
       <div className="receipt-meta">
-        <div><span>Tgl:</span> <span>{format(new Date(transaction.date), 'dd/MM/yy HH:mm')}</span></div>
+        <div><span>Tgl:</span> <span>{safeFormatDate(transaction?.date, 'dd/MM/yy HH:mm')}</span></div>
         <div><span>Trx:</span> <span>{transaction.transactionId}</span></div>
         <div><span>Ksr:</span> <span>Kasir</span></div>
         {transaction.customerName && (

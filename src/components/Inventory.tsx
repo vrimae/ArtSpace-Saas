@@ -5,6 +5,7 @@ import type { InventoryItem } from '../types';
 import { format } from 'date-fns';
 import { Plus, Download, Pencil, Trash2, Calendar, X } from 'lucide-react';
 import { useToast } from './Toast';
+import { safeFormatDate } from '../utils/format';
 import { formatCurrencyInput } from '../utils/currencyInput';
 
 const Inventory = () => {
@@ -160,7 +161,7 @@ const Inventory = () => {
               ) : (
                 inventory.map(item => (
                   <tr key={item.id}>
-                    <td className="text-sm text-secondary">{format(new Date(item.date), 'dd MMM yyyy')}</td>
+                    <td className="text-sm text-secondary">{safeFormatDate(item?.date, 'dd MMM yyyy')}</td>
                     <td className="font-semibold text-sm">{item.name}</td>
                     <td><span className="badge badge-neutral">{item.category}</span></td>
                     <td className="text-center font-semibold" style={{ whiteSpace: 'nowrap' }}>{item.quantity} <span style={{fontSize: '0.8rem', color: 'var(--color-text-secondary)'}}>{item.unit ? `/ ${item.unit}` : ''}</span></td>

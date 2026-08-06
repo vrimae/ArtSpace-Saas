@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Package, Wallet } from 'lucide-react';
 import { getTransactions, getInventory, getFinancialSummary } from '../utils/storage';
 import type { Transaction, InventoryItem } from '../types';
-import { format } from 'date-fns';
+import { safeFormatDate } from '../utils/format';
 
 const Dashboard = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -103,11 +103,11 @@ const Dashboard = () => {
             <table>
               <tbody>
                 {transactions.slice(0, 5).map(t => (
-                  <tr key={t.id}>
-                    <td className="text-sm text-secondary">{format(new Date(t.date), 'dd MMM')}</td>
-                    <td className="text-sm" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</td>
-                    <td className={`font-bold text-right text-sm ${t.type === 'income' ? 'text-income' : 'text-expense'}`} style={{ whiteSpace: 'nowrap' }}>
-                      {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                  <tr key={t?.id || Math.random()}>
+                    <td className="text-sm text-secondary">{safeFormatDate(t?.date, 'dd MMM')}</td>
+                    <td className="text-sm" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(t?.description || '-')}</td>
+                    <td className={`font-bold text-right text-sm ${t?.type === 'income' ? 'text-income' : 'text-expense'}`} style={{ whiteSpace: 'nowrap' }}>
+                      {t?.type === 'income' ? '+' : '-'}{formatCurrency(t?.amount || 0)}
                     </td>
                   </tr>
                 ))}
