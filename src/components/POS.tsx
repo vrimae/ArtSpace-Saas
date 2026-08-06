@@ -282,7 +282,7 @@ const POS = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<AddOn[]>([]);
   const [selectedExtras, setSelectedExtras] = useState<ExtraItem[]>([]);
-  const [extraForm, setExtraForm] = useState({ inventoryId: '', quantity: '' });
+  const [extraForm, setExtraForm] = useState({ inventoryId: '', quantity: '', price: '' });
   const [addonSelectId, setAddonSelectId] = useState<string>('');
   const [isAddonDropdownOpen, setIsAddonDropdownOpen] = useState(false);
   const [addOnQty, setAddOnQty] = useState<number | string>(1);
@@ -377,8 +377,7 @@ const POS = () => {
     setSelectedProduct(product);
     setSelectedAddOns([]);
     setSelectedExtras([]);
-    setExtraForm({ inventoryId: '', quantity: '' });
-    setExtraForm({ inventoryId: '', quantity: '' });
+    setExtraForm({ inventoryId: '', quantity: '', price: '' });
     setAddOnQty(1);
     setProductNote('');
   };
@@ -404,22 +403,24 @@ const POS = () => {
     const qty = parseFloat(extraForm.quantity);
     if (qty <= 0) return;
     
+    const customPrice = extraForm.price !== '' ? parseFloat(extraForm.price) : invItem.unitPrice;
+
     const newExtra: ExtraItem = {
       inventoryId: invItem.id,
       name: invItem.name,
       unit: invItem.unit || '',
       quantity: qty,
-      pricePerUnit: invItem.unitPrice
+      pricePerUnit: isNaN(customPrice) ? 0 : customPrice
     };
 
     setSelectedExtras(prev => {
       const existing = prev.find(p => p.inventoryId === newExtra.inventoryId);
       if (existing) {
-        return prev.map(p => p.inventoryId === newExtra.inventoryId ? { ...p, quantity: p.quantity + qty } : p);
+        return prev.map(p => p.inventoryId === newExtra.inventoryId ? { ...p, quantity: p.quantity + qty, pricePerUnit: newExtra.pricePerUnit } : p);
       }
       return [...prev, newExtra];
     });
-    setExtraForm({ inventoryId: '', quantity: '' });
+    setExtraForm({ inventoryId: '', quantity: '', price: '' });
   };
 
   const handleRemoveExtra = (invId: string) => {
@@ -1303,14 +1304,17 @@ const POS = () => {
             <div style={{ marginBottom: '1.25rem' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>Extra (Bahan Tambahan)</div>
               
-              <form onSubmit={handleAddExtra} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <form onSubmit={handleAddExtra} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
                 <select 
                   className="form-select" 
                   value={extraForm.inventoryId} 
-                  onChange={e => setExtraForm({ ...extraForm, inventoryId: e.target.value })}
-                  style={{ flex: 2, padding: '0.85rem 1rem', fontSize: '0.9rem', minHeight: '48px', borderRadius: 'var(--radius-md)' }}
+                  onChange={e => {
+                    const selectedInv = inventory.find(i => i.id === e.target.value);
+                    setExtraForm({ ...extraForm, inventoryId: e.target.value, price: selectedInv ? selectedInv.unitPrice.toString() : '' });
+                  }}
+                  style={{ flex: '1 1 135px', padding: '0.85rem 0.75rem', fontSize: '0.9rem', minHeight: '48px', borderRadius: 'var(--radius-md)' }}
                 >
-                  <option value="">-- Extra --</option>
+                  <option value="">-- Pilih Bahan --</option>
                   {inventory.map(inv => (
                     <option key={inv.id} value={inv.id}>{inv.name} (Stok: {inv.quantity} {inv.unit})</option>
                   ))}
@@ -1324,7 +1328,17 @@ const POS = () => {
                   onChange={e => setExtraForm({ ...extraForm, quantity: e.target.value })}
                   placeholder="Qty" 
                   step="any"
-                  style={{ flex: 1, minWidth: '70px', padding: '0.85rem 1rem', fontSize: '0.9rem', minHeight: '48px', borderRadius: 'var(--radius-md)' }}
+                  style={{ flex: '0 1 60px', padding: '0.85rem 0.35rem', fontSize: '0.9rem', minHeight: '48px', borderRadius: 'var(--radius-md)', textAlign: 'center' }}
+                />
+                <input 
+                  type="text" 
+                  inputMode="numeric" 
+                  pattern="[0-9\.]*"
+                  className="form-input" 
+                  value={extraForm.price ? formatCurrencyInput(extraForm.price) : ''} 
+                  onChange={e => setExtraForm({ ...extraForm, price: e.target.value.replace(/[^0-9]/g, '') })}
+                  placeholder="Harga (Rp)" 
+                  style={{ flex: '1 1 90px', padding: '0.85rem 0.65rem', fontSize: '0.9rem', minHeight: '48px', borderRadius: 'var(--radius-md)' }}
                 />
                 <button type="submit" className="btn btn-primary" style={{ width: '48px', height: '48px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }} disabled={!extraForm.inventoryId || !extraForm.quantity}><Plus size={20} /></button>
               </form>
