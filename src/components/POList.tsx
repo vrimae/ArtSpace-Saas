@@ -75,12 +75,14 @@ const POList = () => {
         body: JSON.stringify({ target: phone, message, countryCode: '62' })
       }).then(res => res.json()).then(data => {
         if (!data.status) {
+          showToast('error', 'WA Gateway Gagal', 'Token Fonnte tidak valid / perangkat mati. Pop-up blocker memblokir tab manual. Silakan gunakan tombol WA di tabel.');
           const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
           window.open(url, '_blank');
         } else {
           showToast('success', 'Struk WA Terkirim!', `Notifikasi PO selesai dikirim ke pelanggan otomatis.`);
         }
       }).catch(() => {
+        showToast('error', 'WA Gateway Gagal', 'Browser memblokir tab baru (Pop-up Blocker). Silakan izinkan pop-up atau kirim manual via tombol WA di tabel.');
         const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
       });

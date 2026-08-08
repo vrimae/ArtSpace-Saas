@@ -119,9 +119,10 @@ const POS = () => {
     return () => clearTimeout(timer);
   }, [customerPhone]);
 
-  const sendWhatsAppToMember = (tx: any) => {
-    if (!tx || !tx.customerPhone) return;
-    let phone = tx.customerPhone.replace(/\D/g, '');
+  const sendWhatsAppToMember = (tx: any, forceManual: boolean = false) => {
+    let phone = tx.customerPhone || '';
+    if (!phone) return;
+    phone = phone.replace(/\D/g, '');
     if (phone.startsWith('0')) {
       phone = '62' + phone.slice(1);
     } else if (phone.startsWith('8')) {
@@ -175,7 +176,7 @@ const POS = () => {
       }
     }
     
-    if (waGatewayConfig.token) {
+    if (waGatewayConfig.token && !forceManual) {
       let endpoint = waGatewayConfig.url || '/api/fonnte/send';
       if (endpoint === 'https://api.fonnte.com/send' || endpoint.includes('api.fonnte.com')) {
         endpoint = '/api/fonnte/send';
@@ -199,7 +200,7 @@ const POS = () => {
         showToast('success', 'Struk WA Terkirim!', `Pesan otomatis terkirim ke HP Member (${phone}) di balik layar tanpa membuka tab.`);
       }).catch(err => {
         console.error('WA Gateway error:', err);
-        showToast('error', 'WA Gateway Gagal', 'Mencoba membuka WhatsApp di tab browser sebagai cadangan...');
+        showToast('error', 'WA Gateway Gagal', 'Browser memblokir tab baru (Pop-up Blocker). Silakan gunakan tombol Kirim Manual.');
         const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
       });
@@ -1984,13 +1985,24 @@ const POS = () => {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {lastTransaction.customerPhone && (
-                <button 
-                  className="btn" 
-                  onClick={() => sendWhatsAppToMember(lastTransaction)}
-                  style={{ padding: '0.85rem', width: '100%', background: 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)', cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
-                >
-                  <MessageCircle size={18} /> Kirim Ulang Struk WhatsApp
-                </button>
+                <>
+                  <button 
+                    className="btn" 
+                    onClick={() => sendWhatsAppToMember(lastTransaction, false)}
+                    style={{ padding: '0.85rem', width: '100%', background: 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)', cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
+                  >
+                    <MessageCircle size={18} /> {waGatewayConfig.token ? 'Kirim Ulang WA (Otomatis)' : 'Kirim Struk WhatsApp'}
+                  </button>
+                  {waGatewayConfig.token && (
+                    <button 
+                      className="btn" 
+                      onClick={() => sendWhatsAppToMember(lastTransaction, true)}
+                      style={{ padding: '0.85rem', width: '100%', background: 'var(--color-surface)', color: '#22C55E', border: '1px solid #22C55E', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
+                    >
+                      Buka WhatsApp Web (Manual)
+                    </button>
+                  )}
+                </>
               )}
               <button 
                 className="btn btn-primary" 
