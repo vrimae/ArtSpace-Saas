@@ -74,7 +74,7 @@ const POList = () => {
         } else {
           showToast('success', 'Struk WA Terkirim!', `Notifikasi PO selesai dikirim ke pelanggan otomatis.`);
         }
-      }).catch(err => {
+      }).catch(() => {
         const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
       });
@@ -98,7 +98,7 @@ const POList = () => {
           showToast('success', 'Berhasil', 'Pesanan PO ditandai selesai.');
           sendWhatsAppSettle(tx, 0, '');
           fetchPOs();
-        } catch (err) {
+        } catch {
           showToast('error', 'Gagal', 'Tidak dapat mengupdate status PO.');
         }
       }
@@ -124,7 +124,7 @@ const POList = () => {
       sendWhatsAppSettle(tx, sisa, paymentMethod);
       setSettleModal({ isOpen: false, tx: null, sisa: 0, paymentMethod: 'Tunai' });
       fetchPOs();
-    } catch (err) {
+    } catch {
       showToast('error', 'Gagal', 'Tidak dapat mengupdate status PO.');
     }
   };
