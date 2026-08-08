@@ -73,7 +73,6 @@ const POS = () => {
   const [isActiveSubscription, setIsActiveSubscription] = useState(true);
   const [memberPurchaseCount, setMemberPurchaseCount] = useState<number | null>(null);
   const [checkingMember, setCheckingMember] = useState(false);
-  const [customGrandTotal, setCustomGrandTotal] = useState<string>('');
   const [editingCartItem, setEditingCartItem] = useState<{ cartKey: string, price: string } | null>(null);
   const { showToast } = useToast();
   const { isAdmin } = useContext(AuthContext);
@@ -148,9 +147,6 @@ const POS = () => {
     const dpVal = tx.poDpAmount !== undefined ? tx.poDpAmount : tx.total;
     const sisaVal = totalVal - dpVal;
     let totalText = `${formatCurrencyLocal(totalVal)} (${tx.paymentMethod})`;
-    if (tx.items && tx.items.length > 0 && totalVal !== originalCalculatedTotal) {
-      totalText += `\n*(Penyesuaian Harga)*`;
-    }
     if (isPO && sisaVal > 0) {
        totalText += `\n*Sudah Dibayar (DP):* ${formatCurrencyLocal(dpVal)}\n*Sisa Pelunasan:* ${formatCurrencyLocal(sisaVal)}`;
     }
@@ -491,15 +487,7 @@ const POS = () => {
     setCart(prev => prev.filter(item => item.cartKey !== cartKey));
   };
 
-  const calculateOriginalTotal = () => cart.reduce((sum, item) => sum + itemTotalPrice(item), 0);
-  
-  const calculateTotal = () => {
-    if (customGrandTotal.trim() !== '') {
-      const parsed = Number(customGrandTotal.replace(/\D/g, ''));
-      if (!isNaN(parsed)) return parsed;
-    }
-    return calculateOriginalTotal();
-  };
+  const calculateTotal = () => cart.reduce((sum, item) => sum + itemTotalPrice(item), 0);
 
   const processTransaction = async () => {
     setIsSubmitting(true);
@@ -564,7 +552,6 @@ const POS = () => {
       setOrderType('langsung');
       setPoPickupDate('');
       setPoDpAmount('');
-      setCustomGrandTotal('');
       setMemberPurchaseCount(null);
       setShowQRISModal(false);
       setShowSuccessModal(true);
@@ -1319,25 +1306,9 @@ const POS = () => {
                 </div>
               </div>
 
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-1">
-                <span className="font-semibold text-secondary">Total</span>
-                {customGrandTotal.trim() !== '' && (
-                  <button onClick={() => setCustomGrandTotal('')} style={{ background: 'none', border: 'none', fontSize: '0.75rem', color: 'var(--color-expense)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}><X size={12}/> Reset Custom Total</button>
-                )}
-              </div>
-              <div className="flex justify-between items-center p-2 rounded-lg" style={{ background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}>
-                <span className="text-sm font-medium text-secondary mr-2">Rp</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder={calculateOriginalTotal().toLocaleString('id-ID')}
-                  value={customGrandTotal !== '' ? Number(customGrandTotal.replace(/\D/g, '')).toLocaleString('id-ID') : ''}
-                  onChange={(e) => setCustomGrandTotal(e.target.value.replace(/\D/g, ''))}
-                  className="font-extrabold text-xl text-primary text-right"
-                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none' }}
-                />
-              </div>
+            <div className="flex justify-between items-center mb-4">
+              <span className="font-semibold text-secondary">Total</span>
+              <span className="font-extrabold text-xl text-primary">{formatCurrency(calculateTotal())}</span>
             </div>
             <button 
               className="btn btn-primary w-full" 
