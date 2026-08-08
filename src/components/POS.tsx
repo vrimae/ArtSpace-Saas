@@ -27,6 +27,7 @@ interface CartItem {
   addOns: AddOn[];
   extras: ExtraItem[];
   note?: string;
+  customUnitPrice?: number;
 }
 
 
@@ -72,6 +73,8 @@ const POS = () => {
   const [isActiveSubscription, setIsActiveSubscription] = useState(true);
   const [memberPurchaseCount, setMemberPurchaseCount] = useState<number | null>(null);
   const [checkingMember, setCheckingMember] = useState(false);
+  const [customGrandTotal, setCustomGrandTotal] = useState<string>('');
+  const [editingCartItem, setEditingCartItem] = useState<{ cartKey: string, price: string } | null>(null);
   const { showToast } = useToast();
   const { isAdmin } = useContext(AuthContext);
 
@@ -127,7 +130,14 @@ const POS = () => {
     }
     
     const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
-    const itemsText = (tx.items || []).map((item: any) => `▪️ ${item.quantity}x ${item.product.name} (${formatCurrencyLocal(item.quantity * item.product.price)})`).join('\n');
+    
+    let originalCalculatedTotal = 0;
+    const itemsText = (tx.items || []).map((item: any) => {
+      const baseUnit = item.product.price + (item.addOns || []).reduce((s: number, a: any) => s + a.price, 0) + (item.extras || []).reduce((s: number, e: any) => s + (e.pricePerUnit * e.quantity), 0);
+      const unitPrice = item.customUnitPrice !== undefined ? item.customUnitPrice : baseUnit;
+      originalCalculatedTotal += (unitPrice * item.quantity);
+      return `▪️ ${item.quantity}x ${item.product.name} (${formatCurrencyLocal(item.quantity * unitPrice)})`;
+    }).join('\n');
     
     const isPO = tx.poStatus === 'pending';
     const countVal = tx.purchaseCount || 1;
@@ -138,6 +148,9 @@ const POS = () => {
     const dpVal = tx.poDpAmount !== undefined ? tx.poDpAmount : tx.total;
     const sisaVal = totalVal - dpVal;
     let totalText = `${formatCurrencyLocal(totalVal)} (${tx.paymentMethod})`;
+    if (tx.items && tx.items.length > 0 && totalVal !== originalCalculatedTotal) {
+      totalText += `\n*(Penyesuaian Harga)*`;
+    }
     if (isPO && sisaVal > 0) {
        totalText += `\n*Sudah Dibayar (DP):* ${formatCurrencyLocal(dpVal)}\n*Sisa Pelunasan:* ${formatCurrencyLocal(sisaVal)}`;
     }
@@ -456,10 +469,15 @@ const POS = () => {
     showToast('success', 'Ditambahkan!', `${selectedProduct.name} telah ditambahkan ke keranjang`);
   };
 
-  const itemTotalPrice = (item: CartItem) => {
+  const getBaseUnitPrice = (item: CartItem) => {
     const addOnTotal = item.addOns.reduce((s, a) => s + a.price, 0);
     const extrasTotal = item.extras.reduce((s, e) => s + (e.pricePerUnit * e.quantity), 0);
-    return (item.product.price + addOnTotal + extrasTotal) * item.quantity;
+    return item.product.price + addOnTotal + extrasTotal;
+  };
+
+  const itemTotalPrice = (item: CartItem) => {
+    if (item.customUnitPrice !== undefined) return item.customUnitPrice * item.quantity;
+    return getBaseUnitPrice(item) * item.quantity;
   };
 
   const updateQuantity = (cartKey: string, delta: number) => {
@@ -473,7 +491,15 @@ const POS = () => {
     setCart(prev => prev.filter(item => item.cartKey !== cartKey));
   };
 
-  const calculateTotal = () => cart.reduce((sum, item) => sum + itemTotalPrice(item), 0);
+  const calculateOriginalTotal = () => cart.reduce((sum, item) => sum + itemTotalPrice(item), 0);
+  
+  const calculateTotal = () => {
+    if (customGrandTotal.trim() !== '') {
+      const parsed = Number(customGrandTotal.replace(/\D/g, ''));
+      if (!isNaN(parsed)) return parsed;
+    }
+    return calculateOriginalTotal();
+  };
 
   const processTransaction = async () => {
     setIsSubmitting(true);
@@ -538,6 +564,7 @@ const POS = () => {
       setOrderType('langsung');
       setPoPickupDate('');
       setPoDpAmount('');
+      setCustomGrandTotal('');
       setMemberPurchaseCount(null);
       setShowQRISModal(false);
       setShowSuccessModal(true);
@@ -560,7 +587,7 @@ const POS = () => {
       // Telegram Notification
       if (telegramConfig.token && telegramConfig.chatId) {
         try {
-          const itemList = cart.map(item => `- ${item.quantity}x ${item.product.name} (Rp ${item.product.price.toLocaleString('id-ID')})${item.note ? `\n  Catatan: ${item.note}` : ''}`).join('\n');
+          const itemList = cart.map(item => `- ${item.quantity}x ${item.product.name} (Rp ${(item.customUnitPrice !== undefined ? item.customUnitPrice : item.product.price).toLocaleString('id-ID')})${item.note ? `\n  Catatan: ${item.note}` : ''}`).join('\n');
           const message = `🔔 *Transaksi Baru (Vrimae)*\n\n*ID:* ${txId}\n*Total:* Rp ${totalAmount.toLocaleString('id-ID')}\n*Metode:* ${paymentMethod}\n*Pelanggan:* ${customerName.trim() || 'Umum'}\n\n*Pesanan:*\n${itemList}`;
           
           fetch(`https://api.telegram.org/bot${telegramConfig.token}/sendMessage`, {
@@ -1084,8 +1111,45 @@ const POS = () => {
                             Catatan: {item.note}
                           </div>
                         )}
-                        <div className="text-muted text-xs" style={{ marginTop: '0.2rem' }}>
-                          {formatCurrency(item.product.price + item.addOns.reduce((s, a) => s + a.price, 0) + (item.extras ? item.extras.reduce((s, e) => s + (e.pricePerUnit * e.quantity), 0) : 0))} × {item.quantity} = <span className="font-semibold text-primary">{formatCurrency(itemTotalPrice(item))}</span>
+                        <div className="text-muted text-xs flex items-center gap-2" style={{ marginTop: '0.2rem' }}>
+                          {editingCartItem?.cartKey === item.cartKey ? (
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              className="form-input"
+                              style={{ width: '80px', padding: '0.2rem 0.4rem', fontSize: '0.75rem', height: 'auto' }}
+                              value={editingCartItem.price}
+                              onChange={(e) => setEditingCartItem({ ...editingCartItem, price: e.target.value.replace(/\D/g, '') })}
+                              onBlur={() => {
+                                const newPrice = Number(editingCartItem.price);
+                                if (!isNaN(newPrice)) {
+                                  setCart(prev => prev.map(i => i.cartKey === item.cartKey ? { ...i, customUnitPrice: newPrice } : i));
+                                }
+                                setEditingCartItem(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const newPrice = Number(editingCartItem.price);
+                                  if (!isNaN(newPrice)) {
+                                    setCart(prev => prev.map(i => i.cartKey === item.cartKey ? { ...i, customUnitPrice: newPrice } : i));
+                                  }
+                                  setEditingCartItem(null);
+                                }
+                              }}
+                              autoFocus
+                            />
+                          ) : (
+                            <span 
+                              onClick={() => setEditingCartItem({ cartKey: item.cartKey, price: (item.customUnitPrice !== undefined ? item.customUnitPrice : getBaseUnitPrice(item)).toString() })}
+                              style={{ cursor: 'pointer', borderBottom: '1px dashed var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              {formatCurrency(item.customUnitPrice !== undefined ? item.customUnitPrice : getBaseUnitPrice(item))} <Pencil size={10} />
+                            </span>
+                          )}
+                          × {item.quantity} = <span className="font-semibold text-primary">{formatCurrency(itemTotalPrice(item))}</span>
+                          {item.customUnitPrice !== undefined && (
+                            <button onClick={() => setCart(prev => prev.map(i => i.cartKey === item.cartKey ? { ...i, customUnitPrice: undefined } : i))} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-expense)', marginLeft: '4px' }}><X size={12} /></button>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
@@ -1255,9 +1319,25 @@ const POS = () => {
                 </div>
               </div>
 
-            <div className="flex justify-between items-center mb-4">
-              <span className="font-semibold text-secondary">Total</span>
-              <span className="font-extrabold text-xl text-primary">{formatCurrency(calculateTotal())}</span>
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-secondary">Total</span>
+                {customGrandTotal.trim() !== '' && (
+                  <button onClick={() => setCustomGrandTotal('')} style={{ background: 'none', border: 'none', fontSize: '0.75rem', color: 'var(--color-expense)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}><X size={12}/> Reset Custom Total</button>
+                )}
+              </div>
+              <div className="flex justify-between items-center p-2 rounded-lg" style={{ background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}>
+                <span className="text-sm font-medium text-secondary mr-2">Rp</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder={calculateOriginalTotal().toLocaleString('id-ID')}
+                  value={customGrandTotal !== '' ? Number(customGrandTotal.replace(/\D/g, '')).toLocaleString('id-ID') : ''}
+                  onChange={(e) => setCustomGrandTotal(e.target.value.replace(/\D/g, ''))}
+                  className="font-extrabold text-xl text-primary text-right"
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none' }}
+                />
+              </div>
             </div>
             <button 
               className="btn btn-primary w-full" 
