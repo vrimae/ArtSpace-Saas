@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getTransactions, updateTransaction, addTransaction } from '../utils/storage';
 import { safeFormatDate } from '../utils/format';
-import { CheckCircle2, Clock, Search, MessageCircle } from 'lucide-react';
+import { CheckCircle2, Clock, Search, MessageCircle, X } from 'lucide-react';
 import { useToast } from './Toast';
 import type { Transaction } from '../types';
 
@@ -9,6 +9,7 @@ const POList = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [settleModal, setSettleModal] = useState<{ isOpen: boolean; tx: Transaction | null; sisa: number; paymentMethod: string }>({ isOpen: false, tx: null, sisa: 0, paymentMethod: 'Tunai' });
   const { showToast } = useToast();
 
   const fetchPOs = async () => {
@@ -32,31 +33,41 @@ const POList = () => {
     const dpVal = tx.poDpAmount !== undefined ? tx.poDpAmount : tx.amount;
     const sisa = totalVal - dpVal;
     
-    let confirmMsg = `Tandai pesanan PO dari ${tx.customerName || 'Pelanggan'} selesai?`;
     if (sisa > 0) {
-      confirmMsg = `Pelanggan memiliki sisa pelunasan sebesar Rp ${sisa.toLocaleString('id-ID')}.\nTandai selesai dan catat pelunasan ini sebagai pemasukan baru?`;
-    }
-
-    if (confirm(confirmMsg)) {
-      try {
-        await updateTransaction(tx.id, { poStatus: 'selesai' }, 'Admin', 'Menandai PO selesai');
-        
-        if (sisa > 0) {
-          const itemDetails = tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:.*? - /i, '').trim();
-          await addTransaction({
-            type: 'income',
-            amount: sisa,
-            category: 'Penjualan',
-            description: `Pelunasan PO: ${tx.customerName || 'Umum'} - ${itemDetails.substring(0, 50)}...`,
-            date: new Date().toISOString()
-          }, 'Admin', 'Mencatat pelunasan PO');
+      setSettleModal({ isOpen: true, tx, sisa, paymentMethod: 'Tunai' });
+    } else {
+      if (confirm(`Tandai pesanan PO dari ${tx.customerName || 'Pelanggan'} selesai?`)) {
+        try {
+          await updateTransaction(tx.id, { poStatus: 'selesai' }, 'Admin', 'Menandai PO selesai');
+          showToast('success', 'Berhasil', 'Pesanan PO ditandai selesai.');
+          fetchPOs();
+        } catch (err) {
+          showToast('error', 'Gagal', 'Tidak dapat mengupdate status PO.');
         }
-
-        showToast('success', 'Berhasil', 'Pesanan PO ditandai selesai.');
-        fetchPOs();
-      } catch (err) {
-        showToast('error', 'Gagal', 'Tidak dapat mengupdate status PO.');
       }
+    }
+  };
+
+  const confirmSettle = async () => {
+    const { tx, sisa, paymentMethod } = settleModal;
+    if (!tx) return;
+    try {
+      await updateTransaction(tx.id, { poStatus: 'selesai' }, 'Admin', 'Menandai PO selesai');
+      
+      const itemDetails = tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:.*? - /i, '').trim();
+      await addTransaction({
+        type: 'income',
+        amount: sisa,
+        category: 'Penjualan',
+        description: `[${paymentMethod}] Pelunasan PO: ${tx.customerName || 'Umum'} - ${itemDetails.substring(0, 50)}...`,
+        date: new Date().toISOString()
+      }, 'Admin', 'Mencatat pelunasan PO');
+
+      showToast('success', 'Berhasil', 'Pesanan PO dilunasi dan ditandai selesai.');
+      setSettleModal({ isOpen: false, tx: null, sisa: 0, paymentMethod: 'Tunai' });
+      fetchPOs();
+    } catch (err) {
+      showToast('error', 'Gagal', 'Tidak dapat mengupdate status PO.');
     }
   };
 
@@ -184,6 +195,53 @@ const POList = () => {
           </table>
         </div>
       </div>
+      {settleModal.isOpen && settleModal.tx && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3 className="text-xl font-bold">Pelunasan PO</h3>
+              <button onClick={() => setSettleModal({ ...settleModal, isOpen: false })} className="btn-icon"><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: '1rem', background: 'var(--color-surface-alt)', padding: '1rem', borderRadius: '8px' }}>
+                <p className="text-sm text-secondary" style={{ marginBottom: '0.25rem' }}>Pelanggan:</p>
+                <p className="font-bold">{settleModal.tx.customerName || 'Umum'}</p>
+                <div style={{ marginTop: '0.75rem' }}>
+                  <p className="text-sm text-secondary" style={{ marginBottom: '0.25rem' }}>Sisa Tagihan:</p>
+                  <p className="font-black text-xl text-primary">{formatCurrency(settleModal.sisa)}</p>
+                </div>
+              </div>
+              
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Metode Pembayaran</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  {['Tunai', 'QRIS', 'Transfer'].map(method => (
+                    <button
+                      key={method}
+                      onClick={() => setSettleModal({ ...settleModal, paymentMethod: method })}
+                      style={{
+                        padding: '0.75rem',
+                        borderRadius: '8px',
+                        border: `2px solid ${settleModal.paymentMethod === method ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        background: settleModal.paymentMethod === method ? 'rgba(236, 72, 153, 0.1)' : 'var(--color-surface)',
+                        color: settleModal.paymentMethod === method ? 'var(--color-primary)' : 'var(--color-text)',
+                        fontWeight: 600,
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {method}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <button className="btn btn-primary w-full" onClick={confirmSettle}>
+                Tandai Lunas & Selesai
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
