@@ -1159,7 +1159,7 @@ const POS = () => {
                         <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Panjar / DP (Kosongkan jika lunas)</label>
                         <input
                           type="text"
-                          placeholder={`Maks: Rp ${totalAmount.toLocaleString('id-ID')}`}
+                          placeholder={`Maks: Rp ${calculateTotal().toLocaleString('id-ID')}`}
                           value={poDpAmount}
                           onChange={(e) => setPoDpAmount(formatCurrencyInput(e.target.value))}
                           style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: '0.85rem', color: 'var(--color-text)', outline: 'none' }}
