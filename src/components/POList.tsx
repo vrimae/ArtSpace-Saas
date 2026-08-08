@@ -69,10 +69,15 @@ const POList = () => {
     if (waGatewayConfig.token) {
       let endpoint = waGatewayConfig.url || '/api/fonnte/send';
       if (endpoint === 'https://api.fonnte.com/send' || endpoint.includes('api.fonnte.com')) endpoint = '/api/fonnte/send';
+      const fonnteData = new FormData();
+      fonnteData.append('target', phone);
+      fonnteData.append('message', message);
+      fonnteData.append('countryCode', '62');
+
       fetch(endpoint, {
         method: 'POST',
-        headers: { 'Authorization': waGatewayConfig.token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: phone, message, countryCode: '62' })
+        headers: { 'Authorization': waGatewayConfig.token },
+        body: fonnteData
       }).then(res => res.json()).then(data => {
         if (!data.status) {
           showToast('error', 'WA Gateway Gagal', 'Token Fonnte tidak valid / perangkat mati. Pop-up blocker memblokir tab manual. Silakan gunakan tombol WA di tabel.');

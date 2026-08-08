@@ -339,17 +339,17 @@ const Settings = () => {
       if (url === 'https://api.fonnte.com/send' || url.includes('api.fonnte.com')) {
         url = '/api/fonnte/send';
       }
+      const fonnteData = new FormData();
+      fonnteData.append('target', phone);
+      fonnteData.append('message', '✅ *Test WhatsApp Gateway Vrimae*\n\nSelamat! Sistem kasir Vrimae Anda kini terhubung secara OTOMATIS ke WhatsApp pelanggan TANPA PERLU MEMBUKA TAB/BROWSER.');
+      fonnteData.append('countryCode', '62');
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': formData.waGatewayToken,
-          'Content-Type': 'application/json'
+          'Authorization': formData.waGatewayToken
         },
-        body: JSON.stringify({
-          target: phone,
-          message: '✅ *Test WhatsApp Gateway Vrimae*\n\nSelamat! Sistem kasir Vrimae Anda kini terhubung secara OTOMATIS ke WhatsApp pelanggan TANPA PERLU MEMBUKA TAB/BROWSER.',
-          countryCode: '62'
-        })
+        body: fonnteData
       });
       const result = await response.json();
       if (result.status === false && result.reason) {

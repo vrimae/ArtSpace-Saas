@@ -181,17 +181,17 @@ const POS = () => {
       if (endpoint === 'https://api.fonnte.com/send' || endpoint.includes('api.fonnte.com')) {
         endpoint = '/api/fonnte/send';
       }
+      const fonnteData = new FormData();
+      fonnteData.append('target', phone);
+      fonnteData.append('message', message);
+      fonnteData.append('countryCode', '62');
+
       fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Authorization': waGatewayConfig.token,
-          'Content-Type': 'application/json'
+          'Authorization': waGatewayConfig.token
         },
-        body: JSON.stringify({
-          target: phone,
-          message: message,
-          countryCode: '62'
-        })
+        body: fonnteData
       }).then(res => res.json()).then(data => {
         console.log('WA Gateway response:', data);
         if (data.status === false) {
