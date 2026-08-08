@@ -301,7 +301,14 @@ const Finance = () => {
                   return (
                   <tr key={t.id}>
                     <td className="text-sm text-secondary">{safeFormatDate(t.date, 'dd MMM yyyy')}</td>
-                    <td><span className={`badge ${t.type === 'income' ? 'badge-income' : 'badge-expense'}`}>{t.type === 'income' ? 'Masuk' : 'Keluar'}</span></td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <span className={`badge ${t.type === 'income' ? 'badge-income' : 'badge-expense'}`}>{t.type === 'income' ? 'Masuk' : 'Keluar'}</span>
+                      {t.poStatus && (
+                        <span className="badge" style={{ background: t.poStatus === 'pending' ? 'var(--color-warning)' : '#22C55E', color: '#fff', marginLeft: '0.25rem' }}>
+                          {t.poStatus === 'pending' ? 'PO' : 'PO ✅'}
+                        </span>
+                      )}
+                    </td>
                     <td className="text-sm">{parsed.paymentMethod !== '-' ? <span className="badge badge-neutral">{parsed.paymentMethod}</span> : <span className="text-muted">-</span>}</td>
                     <td className="text-sm"><span className="badge badge-neutral">{t.category}</span></td>
                     <td className="text-sm">{parsed.namaPembeli !== '-' ? parsed.namaPembeli : <span className="text-muted">-</span>}</td>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Wallet, PackageOpen, ShoppingCart, LogOut, Settings, Menu, Activity, Lock, Unlock, Bot, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Wallet, PackageOpen, ShoppingCart, LogOut, Settings, Menu, Activity, Lock, Unlock, Bot, ShieldCheck, Clock } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Finance from './components/Finance';
 import Inventory from './components/Inventory';
@@ -11,6 +11,7 @@ import AnalyticsPro from './components/AnalyticsPro';
 import AiAssistant from './components/AiAssistant';
 import ActivityLog from './components/ActivityLog';
 import SuperAdmin from './components/SuperAdmin';
+import POList from './components/POList';
 import { ToastProvider, useToast } from './components/Toast';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { supabase } from './lib/supabase';
@@ -101,6 +102,7 @@ const Sidebar = ({
 
   const navItems = [
     { to: '/pos',       icon: <ShoppingCart size={18} />,    label: 'Kasir'     },
+    { to: '/po',        icon: <Clock size={18} />,           label: 'Daftar PO' },
     { to: '/activity',  icon: <Activity size={18} />, label: 'Riwayat Aktivitas' },
   ];
 
@@ -126,9 +128,10 @@ const Sidebar = ({
     ? [
         adminNavItems[0], // Dashboard
         navItems[0],      // Kasir
+        navItems[1],      // Daftar PO
         adminNavItems[1], // Keuangan
         adminNavItems[2], // Inventori
-        navItems[1],      // Riwayat Aktivitas
+        navItems[2],      // Riwayat Aktivitas
         { ...adminNavItems[3], locked: (!hasAnalyticsAccess && !isSuperAdmin) }, // Analitik Pro
         { ...adminNavItems[4], locked: (!hasAIAccess && !isSuperAdmin) }, // Vrimae AI
         adminNavItems[5], // Setelan
@@ -668,6 +671,7 @@ const App = () => {
           <div style={{ maxWidth: '1280px', margin: '0 auto' }} className="main-inner">
             <Routes>
               <Route path="/pos" element={<POS />} />
+              <Route path="/po" element={<POList />} />
               <Route path="/activity" element={<ActivityLog />} />
               {/* Admin Routes with Middleware Protection */}
               <Route path="/" element={

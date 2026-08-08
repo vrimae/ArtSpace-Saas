@@ -163,6 +163,30 @@ export const getFinancialSummary = async (): Promise<{ total_income: number, tot
   };
 };
 
+export const encodeTransactionDescription = (t: Partial<Transaction>) => {
+  let prefix = '';
+  if (t.poStatus) {
+    prefix += `[PO|${t.poStatus}|${t.poPickupDate || ''}|${t.customerName || ''}|${t.customerPhone || ''}] `;
+  }
+  return prefix + (t.description || '');
+};
+
+export const decodeTransactionDescription = (rowDesc: string) => {
+  let desc = rowDesc || '';
+  let poStatus, poPickupDate, customerName, customerPhone;
+  
+  const poMatch = desc.match(/^\[PO\|(.*?)\|(.*?)\|(.*?)\|(.*?)\]\s/);
+  if (poMatch) {
+    poStatus = poMatch[1] as 'pending' | 'selesai';
+    poPickupDate = poMatch[2];
+    customerName = poMatch[3];
+    customerPhone = poMatch[4];
+    desc = desc.replace(poMatch[0], '');
+  }
+  
+  return { description: desc, poStatus, poPickupDate, customerName, customerPhone };
+};
+
 export const getTransactions = async (limitCount = 100, offset = 0): Promise<Transaction[]> => {
   const user = await getUser();
   if (!user) return [];
@@ -178,13 +202,18 @@ export const getTransactions = async (limitCount = 100, offset = 0): Promise<Tra
     if (!dateStr.endsWith('Z') && !dateStr.includes('+')) {
       dateStr += 'Z';
     }
+    const decoded = decodeTransactionDescription(row.description);
     return {
       id: row.id,
       type: row.type,
       amount: Number(row.amount),
       category: row.category,
-      description: row.description,
+      description: decoded.description,
       date: dateStr,
+      poStatus: decoded.poStatus,
+      poPickupDate: decoded.poPickupDate,
+      customerName: decoded.customerName,
+      customerPhone: decoded.customerPhone
     };
   });
 };
@@ -197,7 +226,7 @@ export const addTransaction = async (t: Omit<Transaction, 'id'> & { id?: string 
     type: t.type,
     amount: t.amount,
     category: t.category,
-    description: t.description,
+    description: encodeTransactionDescription(t),
     date: t.date,
     user_id: user.id
   }]).select('id');
@@ -218,13 +247,26 @@ export const addTransaction = async (t: Omit<Transaction, 'id'> & { id?: string 
 
 export const updateTransaction = async (id: string, t: Partial<Transaction>, actorName?: string, reason?: string) => {
   const user = await checkActiveUser(); if (!user) return;
+  const { data: tx } = await supabase.from('transactions').select('category, description').eq('id', id).single();
+  
   const payload: any = {};
   if (t.type !== undefined) payload.type = t.type;
   if (t.amount !== undefined) payload.amount = t.amount;
   if (t.category !== undefined) payload.category = t.category;
-  if (t.description !== undefined) payload.description = t.description;
   if (t.date !== undefined) payload.date = t.date;
-  const { data: tx } = await supabase.from('transactions').select('category, description').eq('id', id).single();
+  
+  if (t.description !== undefined || t.poStatus !== undefined) {
+    const decodedTx = decodeTransactionDescription(tx?.description || '');
+    const mergedTx = {
+      description: t.description !== undefined ? t.description : decodedTx.description,
+      poStatus: t.poStatus !== undefined ? t.poStatus : decodedTx.poStatus,
+      poPickupDate: t.poPickupDate !== undefined ? t.poPickupDate : decodedTx.poPickupDate,
+      customerName: t.customerName !== undefined ? t.customerName : decodedTx.customerName,
+      customerPhone: t.customerPhone !== undefined ? t.customerPhone : decodedTx.customerPhone,
+    };
+    payload.description = encodeTransactionDescription(mergedTx);
+  }
+
   const { error } = await supabase.from('transactions').update(payload).eq('id', id);
   if (error) { handleApiError('', error); throw error; }
   const finalCategory = t.category || tx?.category || 'Tidak diketahui';

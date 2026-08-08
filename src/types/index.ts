@@ -7,6 +7,10 @@ export interface Transaction {
   category: string;
   description: string;
   date: string; // ISO string
+  poStatus?: 'pending' | 'selesai';
+  poPickupDate?: string;
+  customerName?: string;
+  customerPhone?: string;
 }
 
 export interface InventoryItem {

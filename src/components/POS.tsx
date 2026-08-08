@@ -40,6 +40,8 @@ const POS = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [orderType, setOrderType] = useState<'langsung' | 'po'>('langsung');
+  const [poPickupDate, setPoPickupDate] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [newMenu, setNewMenu] = useState({ name: '', price: '', image: '', category: '', recipes: [] as { inventoryId: string; quantity: number; name?: string; unit?: string }[] });
   const [selectedRecipeInvId, setSelectedRecipeInvId] = useState('');
@@ -482,7 +484,11 @@ const POS = () => {
         amount: totalAmount,
         category: 'Penjualan',
         description: finalDescription,
-        date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ssXXX")
+        date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ssXXX"),
+        poStatus: orderType === 'po' ? 'pending' : undefined,
+        poPickupDate: orderType === 'po' ? poPickupDate : undefined,
+        customerName: customerName.trim() || undefined,
+        customerPhone: customerPhone.trim() || undefined
       });
       
       const txId = txResult?.[0]?.id || `TRX-${Date.now()}`;
@@ -495,13 +501,17 @@ const POS = () => {
         customerPhone: customerPhone.trim(),
         date: new Date(),
         transactionId: txId,
-        purchaseCount: currentPurchaseCount
+        purchaseCount: currentPurchaseCount,
+        poStatus: orderType === 'po' ? 'pending' : undefined,
+        poPickupDate: orderType === 'po' ? poPickupDate : undefined
       };
       setLastTransaction(finishedTx);
       
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
+      setOrderType('langsung');
+      setPoPickupDate('');
       setMemberPurchaseCount(null);
       setShowQRISModal(false);
       setShowSuccessModal(true);
@@ -1100,8 +1110,28 @@ const POS = () => {
 
             <div className={`payment-options-container ${showPaymentOptions ? 'show' : ''}`}>
                 <div style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem', background: 'rgba(236, 72, 153, 0.04)', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(236, 72, 153, 0.15)' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <MessageCircle size={15} color="#22C55E" /> WhatsApp Struk & Member Loyalty
+                  
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                    <button type="button" onClick={() => setOrderType('langsung')} style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', border: `1px solid ${orderType === 'langsung' ? 'var(--color-primary)' : 'var(--color-border)'}`, background: orderType === 'langsung' ? 'rgba(236, 72, 153, 0.1)' : 'var(--color-surface)', color: orderType === 'langsung' ? 'var(--color-primary)' : 'var(--color-text)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}>Langsung</button>
+                    <button type="button" onClick={() => setOrderType('po')} style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', border: `1px solid ${orderType === 'po' ? 'var(--color-primary)' : 'var(--color-border)'}`, background: orderType === 'po' ? 'rgba(236, 72, 153, 0.1)' : 'var(--color-surface)', color: orderType === 'po' ? 'var(--color-primary)' : 'var(--color-text)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}>Pre-Order (PO)</button>
+                  </div>
+                  
+                  {orderType === 'po' && (
+                    <div style={{ marginBottom: '0.25rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Tanggal Pengambilan (PO)</label>
+                      <input
+                        type="datetime-local"
+                        value={poPickupDate}
+                        onChange={(e) => setPoPickupDate(e.target.value)}
+                        style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: '0.85rem', color: 'var(--color-text)', outline: 'none' }}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
+                        onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem' }}>
+                    <MessageCircle size={15} color="#22C55E" /> WhatsApp & Member Loyalty
                   </div>
                   <input
                     type="text"
