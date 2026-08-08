@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext, type FormEvent, type CSSProperties } from 'react';
 import { format } from 'date-fns';
+import { safeFormatDate } from '../utils/format';
 import { ShoppingCart, Check, Trash2, Plus, Minus, Settings, Image as ImageIcon, Pencil, Tag, Search, X, ChevronUp, ChevronDown, Printer, CheckCircle, Lock, MessageCircle, Phone } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Receipt from './Receipt';
@@ -97,7 +98,8 @@ const POS = () => {
           .from('transactions')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .ilike('description', `%[WA: %${corePhone}%]%`);
+          .ilike('description', `%[WA: %${corePhone}%]%`)
+          .not('description', 'ilike', '%[PO|pending%');
         
         if (!error) {
           setMemberPurchaseCount(count || 0);
@@ -126,15 +128,16 @@ const POS = () => {
     const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
     const itemsText = (tx.items || []).map((item: any) => `▪️ ${item.quantity}x ${item.product.name} (${formatCurrencyLocal(item.quantity * item.product.price)})`).join('\n');
     
+    const isPO = tx.poStatus === 'pending';
     const countVal = tx.purchaseCount || 1;
-    const countText = `*Pembelian ke:* ${countVal} 🎉`;
-    const rincianText = `*ID Order:* ${tx.transactionId || 'Baru'}\n${countText}\n${itemsText}`;
+    const countText = isPO ? '' : `*Pembelian ke:* ${countVal} 🎉\n`;
+    const rincianText = `*ID Order:* ${tx.transactionId || 'Baru'}\n${countText}${itemsText}`;
     const totalText = `${formatCurrencyLocal(tx.total)} (${tx.paymentMethod})`;
     const customerNameVal = tx.customerName || 'Member';
     const shopNameVal = waGatewayConfig.shopName || 'Vrimae';
 
     let message = '';
-    if (waGatewayConfig.customTemplate && waGatewayConfig.customTemplate.trim() !== '') {
+    if (waGatewayConfig.customTemplate && waGatewayConfig.customTemplate.trim() !== '' && !isPO) {
       message = waGatewayConfig.customTemplate
         .replace(/\{nama\}/gi, customerNameVal)
         .replace(/\{kunjungan\}/gi, countVal.toString())
@@ -142,11 +145,16 @@ const POS = () => {
         .replace(/\{rincian\}/gi, rincianText)
         .replace(/\{total\}/gi, totalText);
     } else {
-      const loyaltyGreeting = countVal > 1
-        ? `Terima kasih banyak telah menjadi *Member Setia* kami! 💖✨ Ini adalah *pembelian ke-${countVal}* Anda di *${shopNameVal}*! 🥳🔥`
-        : `Selamat datang di *${shopNameVal}*! 💖✨ Terima kasih atas *pembelian perdana (ke-1)* Anda di toko kami! 🥳🔥`;
-        
-      message = `Halo Kak *${customerNameVal}*,\n${loyaltyGreeting}\n\nBerikut rincian transaksi Anda:\n${rincianText}\n\n*Total Pembayaran:* ${totalText}\n\nKami sangat bangga dan bahagia melayani Anda. Ditunggu kedatangannya kembali ya! 😊🙏`;
+      if (isPO) {
+        const pickupStr = tx.poPickupDate ? safeFormatDate(tx.poPickupDate, 'dd MMM yyyy, HH:mm') : '-';
+        message = `Halo Kak *${customerNameVal}*,\nTerima kasih telah melakukan *Pre-Order* di *${shopNameVal}*! 💖✨\n\nBerikut rincian Pre-Order Anda:\n${rincianText}\n\n*Total Tagihan:* ${totalText}\n*Tanggal Pengambilan:* ${pickupStr}\n\nKami akan segera memproses pesanan Anda. Ditunggu kedatangannya! 😊🙏`;
+      } else {
+        const loyaltyGreeting = countVal > 1
+          ? `Terima kasih banyak telah menjadi *Member Setia* kami! 💖✨ Ini adalah *pembelian ke-${countVal}* Anda di *${shopNameVal}*! 🥳🔥`
+          : `Selamat datang di *${shopNameVal}*! 💖✨ Terima kasih atas *pembelian perdana (ke-1)* Anda di toko kami! 🥳🔥`;
+          
+        message = `Halo Kak *${customerNameVal}*,\n${loyaltyGreeting}\n\nBerikut rincian transaksi Anda:\n${rincianText}\n\n*Total Pembayaran:* ${totalText}\n\nKami sangat bangga dan bahagia melayani Anda. Ditunggu kedatangannya kembali ya! 😊🙏`;
+      }
     }
     
     if (waGatewayConfig.token) {
@@ -477,7 +485,9 @@ const POS = () => {
         : `Pesanan: Umum - ${description}`;
       const finalDescription = `[${paymentMethod}] ${baseDesc}${phoneTag}`;
       
-      const currentPurchaseCount = (memberPurchaseCount !== null && corePhone.length >= 8) ? (memberPurchaseCount + 1) : 1;
+      const currentPurchaseCount = (memberPurchaseCount !== null && corePhone.length >= 8) 
+        ? (orderType === 'po' ? memberPurchaseCount : (memberPurchaseCount + 1)) 
+        : (orderType === 'po' ? 0 : 1);
 
       const txResult = await addTransaction({
         type: 'income' as const,
