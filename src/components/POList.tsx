@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { getTransactions, updateTransaction, addTransaction, getUser } from '../utils/storage';
 import { safeFormatDate } from '../utils/format';
 import { CheckCircle2, Clock, Search, MessageCircle, X } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { generateDynamicQRIS } from '../utils/qris';
 import { useToast } from './Toast';
 import type { Transaction } from '../types';
 
@@ -10,6 +12,7 @@ const POList = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: '/api/fonnte/send', customTemplate: '', shopName: 'Vrimae' });
+  const [qrisString, setQrisString] = useState('');
   const [settleModal, setSettleModal] = useState<{ isOpen: boolean; tx: Transaction | null; sisa: number; paymentMethod: string }>({ isOpen: false, tx: null, sisa: 0, paymentMethod: 'Tunai' });
   const { showToast } = useToast();
 
@@ -29,6 +32,9 @@ const POList = () => {
     fetchPOs();
     getUser().then((user: any) => {
       if (user?.user_metadata) {
+        if (user.user_metadata.qris_string) {
+          setQrisString(user.user_metadata.qris_string);
+        }
         const isSuperAdmin = user.email === 'bimdarmawa2@gmail.com' || user.email === 'vrimae23@gmail.com';
         const defaultWaToken = isSuperAdmin ? 'SbmGAc1TxotP4TGuCGpS' : '';
         setWaGatewayConfig({
@@ -292,6 +298,28 @@ const POList = () => {
                   ))}
                 </div>
               </div>
+              
+              {settleModal.paymentMethod === 'QRIS' && qrisString && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem', animation: 'fadeIn 0.3s ease-out' }}>
+                  <div style={{ padding: '1rem', background: '#fff', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    <QRCodeSVG 
+                      value={generateDynamicQRIS(qrisString, settleModal.sisa)} 
+                      size={180}
+                      level="M" 
+                      includeMargin={false}
+                      style={{ display: 'block', borderRadius: '8px' }}
+                    />
+                  </div>
+                  <p className="text-sm text-secondary" style={{ marginTop: '0.75rem', textAlign: 'center', fontWeight: 600 }}>
+                    Scan QRIS untuk membayar Rp {settleModal.sisa.toLocaleString('id-ID')}
+                  </p>
+                </div>
+              )}
+              {settleModal.paymentMethod === 'QRIS' && !qrisString && (
+                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', borderRadius: '8px', fontSize: '0.875rem', textAlign: 'center' }}>
+                  String QRIS belum diatur di menu Setelan.
+                </div>
+              )}
               
               <button className="btn btn-primary w-full" onClick={confirmSettle}>
                 Tandai Lunas & Selesai
