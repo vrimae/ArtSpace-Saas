@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getTransactions, updateTransaction, addTransaction } from '../utils/storage';
+import { getTransactions, updateTransaction, addTransaction, getUser } from '../utils/storage';
 import { safeFormatDate } from '../utils/format';
 import { CheckCircle2, Clock, Search, MessageCircle, X } from 'lucide-react';
 import { useToast } from './Toast';
@@ -9,6 +9,7 @@ const POList = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: '/api/fonnte/send', customTemplate: '', shopName: 'Vrimae' });
   const [settleModal, setSettleModal] = useState<{ isOpen: boolean; tx: Transaction | null; sisa: number; paymentMethod: string }>({ isOpen: false, tx: null, sisa: 0, paymentMethod: 'Tunai' });
   const { showToast } = useToast();
 
@@ -26,7 +27,62 @@ const POList = () => {
 
   useEffect(() => {
     fetchPOs();
+    getUser().then((user: any) => {
+      if (user?.user_metadata) {
+        const isSuperAdmin = user.email === 'bimdarmawa2@gmail.com' || user.email === 'vrimae23@gmail.com';
+        const defaultWaToken = isSuperAdmin ? 'SbmGAc1TxotP4TGuCGpS' : '';
+        setWaGatewayConfig({
+          token: user.user_metadata.wa_gateway_token || defaultWaToken,
+          url: (user.user_metadata?.wa_gateway_url && !user.user_metadata?.wa_gateway_url.includes('api.fonnte.com')) ? user.user_metadata?.wa_gateway_url : '/api/fonnte/send',
+          customTemplate: user.user_metadata.wa_custom_template || '',
+          shopName: user.user_metadata.shop_name || 'Vrimae'
+        });
+      }
+    });
   }, []);
+
+  const sendWhatsAppSettle = (tx: Transaction, sisa: number, method: string) => {
+    if (!tx || !tx.customerPhone) return;
+    let phone = tx.customerPhone.replace(/\D/g, '');
+    if (phone.startsWith('0')) phone = '62' + phone.slice(1);
+    else if (phone.startsWith('8')) phone = '62' + phone;
+    
+    const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+    const itemDetails = tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:.*? - /i, '').trim();
+    
+    const customerNameVal = tx.customerName || 'Member';
+    const shopNameVal = waGatewayConfig.shopName || 'Vrimae';
+    
+    let pelunasanText = '';
+    if (sisa > 0) {
+      pelunasanText = `\nTerima kasih juga atas pelunasan sebesar *${formatCurrencyLocal(sisa)}* menggunakan metode *${method}*.`;
+    }
+
+    const message = `Halo Kak *${customerNameVal}*,\n\nKami menginformasikan bahwa pesanan Pre-Order Anda:\n▪️ ${itemDetails}\n\nTelah berhasil *Selesai / Diambil* di *${shopNameVal}*.${pelunasanText}\n\nTerima kasih banyak telah mempercayakan pesanan Anda kepada kami. Ditunggu kedatangannya kembali! 😊🙏`;
+
+    if (waGatewayConfig.token) {
+      let endpoint = waGatewayConfig.url || '/api/fonnte/send';
+      if (endpoint === 'https://api.fonnte.com/send' || endpoint.includes('api.fonnte.com')) endpoint = '/api/fonnte/send';
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': waGatewayConfig.token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: phone, message, countryCode: '62' })
+      }).then(res => res.json()).then(data => {
+        if (!data.status) {
+          const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+          window.open(url, '_blank');
+        } else {
+          showToast('success', 'Struk WA Terkirim!', `Notifikasi PO selesai dikirim ke pelanggan otomatis.`);
+        }
+      }).catch(err => {
+        const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+      });
+    } else {
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+    }
+  };
 
   const handleCompletePO = async (tx: Transaction) => {
     const totalVal = tx.poTotalAmount || tx.amount;
@@ -40,6 +96,7 @@ const POList = () => {
         try {
           await updateTransaction(tx.id, { poStatus: 'selesai' }, 'Admin', 'Menandai PO selesai');
           showToast('success', 'Berhasil', 'Pesanan PO ditandai selesai.');
+          sendWhatsAppSettle(tx, 0, '');
           fetchPOs();
         } catch (err) {
           showToast('error', 'Gagal', 'Tidak dapat mengupdate status PO.');
@@ -64,6 +121,7 @@ const POList = () => {
       }, 'Admin', 'Mencatat pelunasan PO');
 
       showToast('success', 'Berhasil', 'Pesanan PO dilunasi dan ditandai selesai.');
+      sendWhatsAppSettle(tx, sisa, paymentMethod);
       setSettleModal({ isOpen: false, tx: null, sisa: 0, paymentMethod: 'Tunai' });
       fetchPOs();
     } catch (err) {
