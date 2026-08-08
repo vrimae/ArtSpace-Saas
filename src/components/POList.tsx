@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getTransactions, updateTransaction } from '../utils/storage';
+import { getTransactions, updateTransaction, addTransaction } from '../utils/storage';
 import { safeFormatDate } from '../utils/format';
 import { CheckCircle2, Clock, Search, MessageCircle } from 'lucide-react';
 import { useToast } from './Toast';
@@ -28,9 +28,30 @@ const POList = () => {
   }, []);
 
   const handleCompletePO = async (tx: Transaction) => {
-    if (confirm(`Tandai pesanan PO dari ${tx.customerName || 'Pelanggan'} selesai?`)) {
+    const totalVal = tx.poTotalAmount || tx.amount;
+    const dpVal = tx.poDpAmount !== undefined ? tx.poDpAmount : tx.amount;
+    const sisa = totalVal - dpVal;
+    
+    let confirmMsg = `Tandai pesanan PO dari ${tx.customerName || 'Pelanggan'} selesai?`;
+    if (sisa > 0) {
+      confirmMsg = `Pelanggan memiliki sisa pelunasan sebesar Rp ${sisa.toLocaleString('id-ID')}.\nTandai selesai dan catat pelunasan ini sebagai pemasukan baru?`;
+    }
+
+    if (confirm(confirmMsg)) {
       try {
         await updateTransaction(tx.id, { poStatus: 'selesai' }, 'Admin', 'Menandai PO selesai');
+        
+        if (sisa > 0) {
+          const itemDetails = tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:.*? - /i, '').trim();
+          await addTransaction({
+            type: 'income',
+            amount: sisa,
+            category: 'Penjualan',
+            description: `Pelunasan PO: ${tx.customerName || 'Umum'} - ${itemDetails.substring(0, 50)}...`,
+            date: new Date().toISOString()
+          }, 'Admin', 'Mencatat pelunasan PO');
+        }
+
         showToast('success', 'Berhasil', 'Pesanan PO ditandai selesai.');
         fetchPOs();
       } catch (err) {
@@ -129,8 +150,13 @@ const POList = () => {
                     <td className="text-sm">
                       {t.description.replace(/\[QRIS\]\s*/i, '').replace(/Pesanan:.*? - /i, '')}
                     </td>
-                    <td className="text-right font-bold text-sm">
-                      {formatCurrency(t.amount)}
+                    <td className="text-right text-sm">
+                      <div className="font-bold">{formatCurrency(t.poTotalAmount || t.amount)}</div>
+                      {(t.poDpAmount !== undefined && (t.poTotalAmount || t.amount) - t.poDpAmount > 0) && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-warning)', fontWeight: 600 }}>
+                          DP: {formatCurrency(t.poDpAmount)}
+                        </div>
+                      )}
                     </td>
                     <td>
                       {t.poStatus === 'pending' ? (

@@ -11,6 +11,8 @@ export interface Transaction {
   poPickupDate?: string;
   customerName?: string;
   customerPhone?: string;
+  poTotalAmount?: number;
+  poDpAmount?: number;
 }
 
 export interface InventoryItem {

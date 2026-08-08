@@ -166,25 +166,27 @@ export const getFinancialSummary = async (): Promise<{ total_income: number, tot
 export const encodeTransactionDescription = (t: Partial<Transaction>) => {
   let prefix = '';
   if (t.poStatus) {
-    prefix += `[PO|${t.poStatus}|${t.poPickupDate || ''}|${t.customerName || ''}|${t.customerPhone || ''}] `;
+    prefix += `[PO|${t.poStatus}|${t.poPickupDate || ''}|${t.customerName || ''}|${t.customerPhone || ''}|${t.poTotalAmount || ''}|${t.poDpAmount || ''}] `;
   }
   return prefix + (t.description || '');
 };
 
 export const decodeTransactionDescription = (rowDesc: string) => {
   let desc = rowDesc || '';
-  let poStatus, poPickupDate, customerName, customerPhone;
+  let poStatus, poPickupDate, customerName, customerPhone, poTotalAmount, poDpAmount;
   
-  const poMatch = desc.match(/^\[PO\|(.*?)\|(.*?)\|(.*?)\|(.*?)\]\s/);
+  const poMatch = desc.match(/^\[PO\|(.*?)\|(.*?)\|(.*?)\|(.*?)(?:\|(.*?)\|(.*?))?\]\s/);
   if (poMatch) {
     poStatus = poMatch[1] as 'pending' | 'selesai';
     poPickupDate = poMatch[2];
     customerName = poMatch[3];
     customerPhone = poMatch[4];
+    poTotalAmount = poMatch[5] ? Number(poMatch[5]) : undefined;
+    poDpAmount = poMatch[6] ? Number(poMatch[6]) : undefined;
     desc = desc.replace(poMatch[0], '');
   }
   
-  return { description: desc, poStatus, poPickupDate, customerName, customerPhone };
+  return { description: desc, poStatus, poPickupDate, customerName, customerPhone, poTotalAmount, poDpAmount };
 };
 
 export const getTransactions = async (limitCount = 100, offset = 0): Promise<Transaction[]> => {
@@ -213,7 +215,9 @@ export const getTransactions = async (limitCount = 100, offset = 0): Promise<Tra
       poStatus: decoded.poStatus,
       poPickupDate: decoded.poPickupDate,
       customerName: decoded.customerName,
-      customerPhone: decoded.customerPhone
+      customerPhone: decoded.customerPhone,
+      poTotalAmount: decoded.poTotalAmount,
+      poDpAmount: decoded.poDpAmount
     };
   });
 };
@@ -263,6 +267,8 @@ export const updateTransaction = async (id: string, t: Partial<Transaction>, act
       poPickupDate: t.poPickupDate !== undefined ? t.poPickupDate : decodedTx.poPickupDate,
       customerName: t.customerName !== undefined ? t.customerName : decodedTx.customerName,
       customerPhone: t.customerPhone !== undefined ? t.customerPhone : decodedTx.customerPhone,
+      poTotalAmount: t.poTotalAmount !== undefined ? t.poTotalAmount : decodedTx.poTotalAmount,
+      poDpAmount: t.poDpAmount !== undefined ? t.poDpAmount : decodedTx.poDpAmount,
     };
     payload.description = encodeTransactionDescription(mergedTx);
   }

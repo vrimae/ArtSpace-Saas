@@ -43,6 +43,7 @@ const POS = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [orderType, setOrderType] = useState<'langsung' | 'po'>('langsung');
   const [poPickupDate, setPoPickupDate] = useState('');
+  const [poDpAmount, setPoDpAmount] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [newMenu, setNewMenu] = useState({ name: '', price: '', image: '', category: '', recipes: [] as { inventoryId: string; quantity: number; name?: string; unit?: string }[] });
   const [selectedRecipeInvId, setSelectedRecipeInvId] = useState('');
@@ -132,7 +133,15 @@ const POS = () => {
     const countVal = tx.purchaseCount || 1;
     const countText = isPO ? '' : `*Pembelian ke:* ${countVal} 🎉\n`;
     const rincianText = `*ID Order:* ${tx.transactionId || 'Baru'}\n${countText}${itemsText}`;
-    const totalText = `${formatCurrencyLocal(tx.total)} (${tx.paymentMethod})`;
+    
+    const totalVal = tx.poTotalAmount || tx.total;
+    const dpVal = tx.poDpAmount !== undefined ? tx.poDpAmount : tx.total;
+    const sisaVal = totalVal - dpVal;
+    let totalText = `${formatCurrencyLocal(totalVal)} (${tx.paymentMethod})`;
+    if (isPO && sisaVal > 0) {
+       totalText += `\n*Sudah Dibayar (DP):* ${formatCurrencyLocal(dpVal)}\n*Sisa Pelunasan:* ${formatCurrencyLocal(sisaVal)}`;
+    }
+    
     const customerNameVal = tx.customerName || 'Member';
     const shopNameVal = waGatewayConfig.shopName || 'Vrimae';
 
@@ -489,16 +498,20 @@ const POS = () => {
         ? (orderType === 'po' ? memberPurchaseCount : (memberPurchaseCount + 1)) 
         : (orderType === 'po' ? 0 : 1);
 
+      const finalDpAmount = orderType === 'po' && poDpAmount ? Number(poDpAmount.replace(/\D/g, '')) : totalAmount;
+
       const txResult = await addTransaction({
         type: 'income' as const,
-        amount: totalAmount,
+        amount: orderType === 'po' ? finalDpAmount : totalAmount,
         category: 'Penjualan',
         description: finalDescription,
         date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ssXXX"),
         poStatus: orderType === 'po' ? 'pending' : undefined,
         poPickupDate: orderType === 'po' ? poPickupDate : undefined,
         customerName: customerName.trim() || undefined,
-        customerPhone: customerPhone.trim() || undefined
+        customerPhone: customerPhone.trim() || undefined,
+        poTotalAmount: orderType === 'po' ? totalAmount : undefined,
+        poDpAmount: orderType === 'po' ? finalDpAmount : undefined
       });
       
       const txId = txResult?.[0]?.id || `TRX-${Date.now()}`;
@@ -513,7 +526,9 @@ const POS = () => {
         transactionId: txId,
         purchaseCount: currentPurchaseCount,
         poStatus: orderType === 'po' ? 'pending' : undefined,
-        poPickupDate: orderType === 'po' ? poPickupDate : undefined
+        poPickupDate: orderType === 'po' ? poPickupDate : undefined,
+        poTotalAmount: orderType === 'po' ? totalAmount : undefined,
+        poDpAmount: orderType === 'po' ? finalDpAmount : undefined
       };
       setLastTransaction(finishedTx);
       
@@ -522,6 +537,7 @@ const POS = () => {
       setCustomerPhone('');
       setOrderType('langsung');
       setPoPickupDate('');
+      setPoDpAmount('');
       setMemberPurchaseCount(null);
       setShowQRISModal(false);
       setShowSuccessModal(true);
@@ -1127,16 +1143,30 @@ const POS = () => {
                   </div>
                   
                   {orderType === 'po' && (
-                    <div style={{ marginBottom: '0.25rem' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Tanggal Pengambilan (PO)</label>
-                      <input
-                        type="datetime-local"
-                        value={poPickupDate}
-                        onChange={(e) => setPoPickupDate(e.target.value)}
-                        style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: '0.85rem', color: 'var(--color-text)', outline: 'none' }}
-                        onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
-                        onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
-                      />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '0.25rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Tanggal Pengambilan (PO)</label>
+                        <input
+                          type="datetime-local"
+                          value={poPickupDate}
+                          onChange={(e) => setPoPickupDate(e.target.value)}
+                          style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: '0.85rem', color: 'var(--color-text)', outline: 'none' }}
+                          onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
+                          onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Panjar / DP (Kosongkan jika lunas)</label>
+                        <input
+                          type="text"
+                          placeholder={`Maks: Rp ${totalAmount.toLocaleString('id-ID')}`}
+                          value={poDpAmount}
+                          onChange={(e) => setPoDpAmount(formatCurrencyInput(e.target.value))}
+                          style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: '0.85rem', color: 'var(--color-text)', outline: 'none' }}
+                          onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
+                          onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
+                        />
+                      </div>
                     </div>
                   )}
 
