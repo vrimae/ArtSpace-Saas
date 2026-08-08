@@ -172,12 +172,20 @@ const Finance = () => {
       detailMenu = detailMenu.replace(match[0], '');
     }
 
+    let withoutPrefix = '';
     if (detailMenu.startsWith('Pesanan:')) {
-      const withoutPrefix = detailMenu.replace('Pesanan:', '').trim();
+      withoutPrefix = detailMenu.replace('Pesanan:', '').trim();
+    } else if (detailMenu.startsWith('Pelunasan PO:')) {
+      withoutPrefix = detailMenu.replace('Pelunasan PO:', '').trim();
+    }
+
+    if (withoutPrefix) {
       const dashIdx = withoutPrefix.indexOf(' - ');
       if (dashIdx !== -1) {
         namaPembeli = withoutPrefix.substring(0, dashIdx).trim();
         detailMenu = withoutPrefix.substring(dashIdx + 3).trim();
+      } else {
+        namaPembeli = withoutPrefix;
       }
     }
 
