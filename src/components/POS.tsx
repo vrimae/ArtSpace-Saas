@@ -99,7 +99,7 @@ const POS = () => {
           .from('transactions')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .ilike('description', `%[WA: %${corePhone}%]%`)
+          .like('description', `%[WA: ${corePhone}]%`)
           .not('description', 'ilike', '%[PO|pending%');
         
         if (!error) {
