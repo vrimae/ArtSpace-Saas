@@ -1,4 +1,5 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -49,7 +50,7 @@ class ErrorBoundary extends Component<Props, State> {
             <RefreshCw size={20} />
             Muat Ulang Halaman
           </button>
-          {process.env.NODE_ENV === 'development' && this.state.error && (
+          {import.meta.env.DEV && this.state.error && (
             <pre style={{
               marginTop: '40px', padding: '15px', background: '#1e293b', color: '#f87171',
               borderRadius: '8px', maxWidth: '80%', overflowX: 'auto', textAlign: 'left', fontSize: '0.8rem'
