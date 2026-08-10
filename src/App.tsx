@@ -1,17 +1,19 @@
-import { useState, useEffect, useRef, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { LayoutDashboard, Wallet, PackageOpen, ShoppingCart, LogOut, Settings, Menu, Activity, Lock, Unlock, Bot, ShieldCheck, Clock } from 'lucide-react';
-import Dashboard from './components/Dashboard';
-import Finance from './components/Finance';
-import Inventory from './components/Inventory';
-import POS from './components/POS';
-import SettingsPage from './components/Settings';
-import Login from './components/Login';
-import AnalyticsPro from './components/AnalyticsPro';
-import AiAssistant from './components/AiAssistant';
-import ActivityLog from './components/ActivityLog';
-import SuperAdmin from './components/SuperAdmin';
-import POList from './components/POList';
+import ErrorBoundary from './components/ErrorBoundary';
+
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Finance = lazy(() => import('./components/Finance'));
+const Inventory = lazy(() => import('./components/Inventory'));
+const POS = lazy(() => import('./components/POS'));
+const SettingsPage = lazy(() => import('./components/Settings'));
+const Login = lazy(() => import('./components/Login'));
+const AnalyticsPro = lazy(() => import('./components/AnalyticsPro'));
+const AiAssistant = lazy(() => import('./components/AiAssistant'));
+const ActivityLog = lazy(() => import('./components/ActivityLog'));
+const SuperAdmin = lazy(() => import('./components/SuperAdmin'));
+const POList = lazy(() => import('./components/POList'));
 import { ToastProvider, useToast } from './components/Toast';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { supabase } from './lib/supabase';
@@ -621,11 +623,20 @@ const App = () => {
 
   if (recoveryMode || !session) return <ToastProvider><Login initialViewMode={recoveryMode ? 'reset_password' : 'login'} /></ToastProvider>;
 
+  // Loading spinner untuk suspense
+  const LoadingSpinner = () => (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
+      <div style={{ border: '4px solid rgba(59, 130, 246, 0.1)', borderTopColor: '#3b82f6', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }}></div>
+      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
   return (
-    <ToastProvider>
-      <AuthContext.Provider value={{ isAdmin, setIsAdmin, adminPin, setAdminPin }}>
-      <AuthListener />
-      <Router>
+    <ErrorBoundary>
+      <ToastProvider>
+        <AuthContext.Provider value={{ isAdmin, setIsAdmin, adminPin, setAdminPin }}>
+        <AuthListener />
+        <Router>
         <div className={`app-container ${!isAdmin ? 'kasir-mode' : ''}`}>
         {/* ── Top Navbar ── */}
         <header className="top-navbar">
@@ -669,7 +680,8 @@ const App = () => {
         {/* Main Content — dibawah navbar */}
         <main className={`main-content ${location.pathname === '/pos' ? 'pos-mode' : ''}`}>
           <div style={{ maxWidth: '1280px', margin: '0 auto' }} className="main-inner">
-            <Routes>
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
               <Route path="/pos" element={<POS />} />
               <Route path="/po" element={<POList />} />
               <Route path="/activity" element={<ActivityLog />} />
@@ -707,7 +719,8 @@ const App = () => {
                   <SettingsPage />
                 </ProtectedRoute>
               } />
-            </Routes>
+              </Routes>
+            </Suspense>
           </div>
         </main>
 
@@ -717,6 +730,7 @@ const App = () => {
       </Router>
       </AuthContext.Provider>
     </ToastProvider>
+    </ErrorBoundary>
   );
 };
 

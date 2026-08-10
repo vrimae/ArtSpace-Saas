@@ -167,6 +167,14 @@ body {
   overflow-x: clip;
   width: 100%;
   touch-action: pan-x pan-y;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+button, a, .menu-item, .card {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 h1, h2, h3, h4, h5, h6 {
