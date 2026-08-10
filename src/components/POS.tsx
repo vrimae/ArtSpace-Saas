@@ -69,7 +69,7 @@ const POS = () => {
   const [dynamicQRIS, setDynamicQRIS] = useState('');
   const [qrisString, setQrisString] = useState('');
   const [telegramConfig, setTelegramConfig] = useState({ token: '', chatId: '' });
-  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: '/api/fonnte/send', customTemplate: '', shopName: 'Vrimae' });
+  const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: '/api/fonnte/send', provider: 'fonnte', numberKey: '', customTemplate: '', shopName: 'Vrimae' });
   const [isActiveSubscription, setIsActiveSubscription] = useState(true);
   const [memberPurchaseCount, setMemberPurchaseCount] = useState<number | null>(null);
   const [checkingMember, setCheckingMember] = useState(false);
@@ -177,33 +177,54 @@ const POS = () => {
     }
     
     if (waGatewayConfig.token && !forceManual) {
-      let endpoint = waGatewayConfig.url || '/api/fonnte/send';
-      if (endpoint === 'https://api.fonnte.com/send' || endpoint.includes('api.fonnte.com')) {
-        endpoint = '/api/fonnte/send';
-      }
-      const fonnteData = new FormData();
-      fonnteData.append('target', phone);
-      fonnteData.append('message', message);
-      fonnteData.append('countryCode', '62');
-
-      fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': waGatewayConfig.token
-        },
-        body: fonnteData
-      }).then(res => res.json()).then(data => {
-        console.log('WA Gateway response:', data);
-        if (data.status === false) {
-          throw new Error(data.reason || 'Gagal dari pihak Fonnte');
+      if (waGatewayConfig.provider === 'watzap') {
+        fetch('https://api.watzap.id/v1/sendMessage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: waGatewayConfig.token,
+            number_key: waGatewayConfig.numberKey,
+            phone_no: phone,
+            message: message
+          })
+        }).then(res => res.json()).then(data => {
+          if (data.status !== '200' && data.status !== 200) {
+            throw new Error(data.message || 'Gagal dari pihak Watzap');
+          }
+          showToast('success', 'Struk WA Terkirim!', `Pesan otomatis terkirim ke HP Member (${phone}) via Watzap.`);
+        }).catch(err => {
+          console.error('WA Gateway error:', err);
+          showToast('error', 'WA Gateway Gagal', 'Browser memblokir tab baru (Pop-up Blocker). Silakan gunakan tombol Kirim Manual.');
+          const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+          window.open(url, '_blank');
+        });
+      } else {
+        let endpoint = waGatewayConfig.url || '/api/fonnte/send';
+        if (endpoint === 'https://api.fonnte.com/send' || endpoint.includes('api.fonnte.com')) {
+          endpoint = '/api/fonnte/send';
         }
-        showToast('success', 'Struk WA Terkirim!', `Pesan otomatis terkirim ke HP Member (${phone}) di balik layar tanpa membuka tab.`);
-      }).catch(err => {
-        console.error('WA Gateway error:', err);
-        showToast('error', 'WA Gateway Gagal', 'Browser memblokir tab baru (Pop-up Blocker). Silakan gunakan tombol Kirim Manual.');
-        const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
-      });
+        const fonnteData = new FormData();
+        fonnteData.append('target', phone);
+        fonnteData.append('message', message);
+        fonnteData.append('countryCode', '62');
+
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Authorization': waGatewayConfig.token },
+          body: fonnteData
+        }).then(res => res.json()).then(data => {
+          console.log('WA Gateway response:', data);
+          if (data.status === false) {
+            throw new Error(data.reason || 'Gagal dari pihak Fonnte');
+          }
+          showToast('success', 'Struk WA Terkirim!', `Pesan otomatis terkirim ke HP Member (${phone}) di balik layar tanpa membuka tab.`);
+        }).catch(err => {
+          console.error('WA Gateway error:', err);
+          showToast('error', 'WA Gateway Gagal', 'Browser memblokir tab baru (Pop-up Blocker). Silakan gunakan tombol Kirim Manual.');
+          const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+          window.open(url, '_blank');
+        });
+      }
     } else {
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
       window.open(url, '_blank');
@@ -352,6 +373,8 @@ const POS = () => {
         setWaGatewayConfig({
           token: user.user_metadata.wa_gateway_token || defaultWaToken,
           url: (user.user_metadata?.wa_gateway_url && !user.user_metadata?.wa_gateway_url.includes('api.fonnte.com')) ? user.user_metadata?.wa_gateway_url : '/api/fonnte/send',
+          provider: user.user_metadata.wa_gateway_provider || 'fonnte',
+          numberKey: user.user_metadata.wa_gateway_number_key || '',
           customTemplate: user.user_metadata.wa_custom_template || '',
           shopName: user.user_metadata.shop_name || 'Vrimae'
         });

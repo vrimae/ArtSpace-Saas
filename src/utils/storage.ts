@@ -196,6 +196,7 @@ export const getTransactions = async (limitCount = 100, offset = 0): Promise<Tra
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
+    .order('date', { ascending: false })
     .order('created_at', { ascending: false })
     .range(offset, offset + limitCount - 1);
   if (error) { console.error('getTransactions error:', error); return []; }
@@ -296,6 +297,7 @@ export const getInventory = async (): Promise<InventoryItem[]> => {
     .from('inventory')
     .select('*')
     .eq('user_id', user.id)
+    .order('date', { ascending: false })
     .order('created_at', { ascending: false });
   if (error) { console.error('getInventory error:', error); return []; }
   

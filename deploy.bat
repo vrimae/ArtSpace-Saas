@@ -4,7 +4,7 @@ echo Mengunggah Pembaruan (Git Push) ke GitHub...
 echo ===================================================
 
 git add .
-git commit -m "feat: mengganti resep dengan fitur extra bahan baku"
+git commit -m "Auto-deploy: Update Watzap integration and fixing date sort"
 git push
 
 echo.

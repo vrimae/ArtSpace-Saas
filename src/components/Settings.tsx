@@ -60,6 +60,8 @@ const Settings = () => {
     geminiApiKey: '',
     waGatewayToken: '',
     waGatewayUrl: '/api/fonnte/send',
+    waGatewayProvider: 'fonnte',
+    waGatewayNumberKey: '',
     waTestPhone: '',
     waCustomTemplate: '',
   });
@@ -102,6 +104,8 @@ const Settings = () => {
           geminiApiKey: user.user_metadata?.gemini_api_key || '',
           waGatewayToken: user.user_metadata?.wa_gateway_token || defaultWaToken,
           waGatewayUrl: (user.user_metadata?.wa_gateway_url && !user.user_metadata?.wa_gateway_url.includes('api.fonnte.com')) ? user.user_metadata?.wa_gateway_url : '/api/fonnte/send',
+          waGatewayProvider: user.user_metadata?.wa_gateway_provider || 'fonnte',
+          waGatewayNumberKey: user.user_metadata?.wa_gateway_number_key || '',
           waCustomTemplate: user.user_metadata?.wa_custom_template || '',
         }));
       }
@@ -253,6 +257,8 @@ const Settings = () => {
           gemini_api_key: formData.geminiApiKey,
           wa_gateway_token: formData.waGatewayToken,
           wa_gateway_url: formData.waGatewayUrl || '/api/fonnte/send',
+          wa_gateway_provider: formData.waGatewayProvider || 'fonnte',
+          wa_gateway_number_key: formData.waGatewayNumberKey || '',
           wa_custom_template: formData.waCustomTemplate,
         }
       };
@@ -326,38 +332,58 @@ const Settings = () => {
 
   const handleTestWAGateway = async () => {
     if (!formData.waGatewayToken || !formData.waTestPhone) {
-      showToast('error', 'Gagal', 'Token WA Gateway (Fonnte) dan No. HP Tujuan Test harus diisi.');
+      showToast('error', 'Gagal', 'Token/API Key WA Gateway dan No. HP Tujuan Test harus diisi.');
       return;
     }
+    if (formData.waGatewayProvider === 'watzap' && !formData.waGatewayNumberKey) {
+      showToast('error', 'Gagal', 'Number Key Watzap harus diisi.');
+      return;
+    }
+
     setLoading(true);
     try {
       let phone = formData.waTestPhone.replace(/\D/g, '');
       if (phone.startsWith('0')) phone = '62' + phone.slice(1);
       else if (phone.startsWith('8')) phone = '62' + phone;
 
-      let url = formData.waGatewayUrl || '/api/fonnte/send';
-      if (url === 'https://api.fonnte.com/send' || url.includes('api.fonnte.com')) {
-        url = '/api/fonnte/send';
-      }
-      const fonnteData = new FormData();
-      fonnteData.append('target', phone);
-      fonnteData.append('message', '✅ *Test WhatsApp Gateway Vrimae*\n\nSelamat! Sistem kasir Vrimae Anda kini terhubung secara OTOMATIS ke WhatsApp pelanggan TANPA PERLU MEMBUKA TAB/BROWSER.');
-      fonnteData.append('countryCode', '62');
+      if (formData.waGatewayProvider === 'watzap') {
+        const response = await fetch('https://api.watzap.id/v1/sendMessage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: formData.waGatewayToken,
+            number_key: formData.waGatewayNumberKey,
+            phone_no: phone,
+            message: '✅ *Test WhatsApp Gateway Vrimae*\n\nSelamat! Sistem kasir Vrimae Anda kini terhubung secara OTOMATIS ke Watzap.id TANPA PERLU MEMBUKA TAB/BROWSER.'
+          })
+        });
+        const result = await response.json();
+        if (result.status !== '200' && result.status !== 200) {
+          throw new Error(result.message || 'Gagal mengirim pesan via Watzap');
+        }
+      } else {
+        let url = formData.waGatewayUrl || '/api/fonnte/send';
+        if (url === 'https://api.fonnte.com/send' || url.includes('api.fonnte.com')) {
+          url = '/api/fonnte/send';
+        }
+        const fonnteData = new FormData();
+        fonnteData.append('target', phone);
+        fonnteData.append('message', '✅ *Test WhatsApp Gateway Vrimae*\n\nSelamat! Sistem kasir Vrimae Anda kini terhubung secara OTOMATIS ke WhatsApp pelanggan TANPA PERLU MEMBUKA TAB/BROWSER.');
+        fonnteData.append('countryCode', '62');
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': formData.waGatewayToken
-        },
-        body: fonnteData
-      });
-      const result = await response.json();
-      if (result.status === false && result.reason) {
-        throw new Error(result.reason);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Authorization': formData.waGatewayToken },
+          body: fonnteData
+        });
+        const result = await response.json();
+        if (result.status === false && result.reason) {
+          throw new Error(result.reason);
+        }
       }
       showToast('success', 'Berhasil', 'Pesan test terkirim otomatis di balik layar ke WA: ' + phone);
     } catch (error: any) {
-      showToast('error', 'Koneksi WA Gateway Gagal', error.message || 'Periksa kembali token Fonnte atau koneksi Anda.');
+      showToast('error', 'Koneksi WA Gateway Gagal', error.message || 'Periksa kembali token atau koneksi Anda.');
     } finally {
       setLoading(false);
     }
@@ -629,33 +655,71 @@ const Settings = () => {
                   <strong>Setiap Akun Memiliki Nomor Pengirim Sendiri:</strong> Anda dapat menghubungkan nomor WhatsApp khusus untuk toko Anda dengan menaruh <strong>Token API Fonnte</strong> milik Anda. Setiap transaksi yang diselesaikan oleh kasir di akun ini akan otomatis dikirimkan dari nomor WhatsApp yang dihubungkan!
                 </p>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div className="form-group mb-0">
-                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                      <span>Token API Fonnte (Khusus Akun Ini)</span>
-                      <button 
-                        type="button" 
-                        onClick={handleCheckWADevice}
-                        style={{ border: 'none', background: 'none', color: 'var(--color-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                      >
-                        {waDeviceStatus.loading ? '⏳ Memeriksa...' : '🔍 Cek Nomor Aktif'}
-                      </button>
-                    </label>
-                    <input 
-                      type="text" className="form-input" placeholder="Masukkan Token Rahasia Fonnte Akun Anda..."
-                      value={formData.waGatewayToken || ''} onChange={e => setFormData({...formData, waGatewayToken: e.target.value})} 
-                      style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
-                    />
-                  </div>
-                  <div className="form-group mb-0">
-                    <label className="form-label" style={{ marginBottom: '0.4rem' }}>URL Gateway API (Opsional)</label>
-                    <input 
-                      type="text" className="form-input" placeholder="/api/fonnte/send"
-                      value={formData.waGatewayUrl || ''} onChange={e => setFormData({...formData, waGatewayUrl: e.target.value})} 
-                      style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
-                    />
+                    <label className="form-label" style={{ marginBottom: '0.4rem' }}>Provider WhatsApp Gateway</label>
+                    <select 
+                      className="form-input" 
+                      value={formData.waGatewayProvider} 
+                      onChange={e => setFormData({...formData, waGatewayProvider: e.target.value})}
+                      style={{ appearance: 'auto' }}
+                    >
+                      <option value="fonnte">Fonnte (Default)</option>
+                      <option value="watzap">Watzap.id</option>
+                    </select>
                   </div>
                 </div>
+
+                {formData.waGatewayProvider === 'fonnte' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="form-group mb-0">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <span>Token API Fonnte</span>
+                        <button 
+                          type="button" 
+                          onClick={handleCheckWADevice}
+                          style={{ border: 'none', background: 'none', color: 'var(--color-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                        >
+                          {waDeviceStatus.loading ? '⏳ Memeriksa...' : '🔍 Cek Nomor Aktif'}
+                        </button>
+                      </label>
+                      <input 
+                        type="text" className="form-input" placeholder="Masukkan Token Rahasia Fonnte..."
+                        value={formData.waGatewayToken || ''} onChange={e => setFormData({...formData, waGatewayToken: e.target.value})} 
+                        style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                    <div className="form-group mb-0">
+                      <label className="form-label" style={{ marginBottom: '0.4rem' }}>URL Gateway API (Opsional)</label>
+                      <input 
+                        type="text" className="form-input" placeholder="/api/fonnte/send"
+                        value={formData.waGatewayUrl || ''} onChange={e => setFormData({...formData, waGatewayUrl: e.target.value})} 
+                        style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {formData.waGatewayProvider === 'watzap' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="form-group mb-0">
+                      <label className="form-label" style={{ marginBottom: '0.4rem' }}>API Key (Watzap)</label>
+                      <input 
+                        type="text" className="form-input" placeholder="Masukkan API Key Watzap Anda..."
+                        value={formData.waGatewayToken || ''} onChange={e => setFormData({...formData, waGatewayToken: e.target.value})} 
+                        style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                    <div className="form-group mb-0">
+                      <label className="form-label" style={{ marginBottom: '0.4rem' }}>Number Key (Watzap)</label>
+                      <input 
+                        type="text" className="form-input" placeholder="Masukkan Number Key WhatsApp..."
+                        value={formData.waGatewayNumberKey || ''} onChange={e => setFormData({...formData, waGatewayNumberKey: e.target.value})} 
+                        style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {waDeviceStatus.checked && (
                   <div style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: '10px', background: waDeviceStatus.error ? 'rgba(239, 68, 68, 0.08)' : 'rgba(34, 197, 94, 0.08)', border: `1px solid ${waDeviceStatus.error ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
