@@ -14,8 +14,9 @@ const Finance = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [exportConfirm, setExportConfirm] = useState<{ type: 'CSV' | 'Excel'; count: number } | null>(null);
-  const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month'>('all');
-  const [dateSearch, setDateSearch] = useState('');
+  const [filterMode, setFilterMode] = useState<'all' | 'daily' | 'monthly'>('all');
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -152,13 +153,17 @@ const Finance = () => {
 
   const filteredTransactions = useMemo(() => transactions.filter(t => {
     if (!t) return false;
-    if (dateSearch && !String(t?.date || '').startsWith(dateSearch)) return false;
-    if (timeFilter === 'all') return true;
-    const date = safeParseDate(t?.date);
-    if (timeFilter === 'week') return isThisWeek(date);
-    if (timeFilter === 'month') return isThisMonth(date);
+    if (filterMode === 'all') return true;
+    
+    const tDateStr = String(t?.date || '');
+    if (filterMode === 'daily') {
+      return tDateStr.startsWith(selectedDate);
+    }
+    if (filterMode === 'monthly') {
+      return tDateStr.startsWith(selectedMonth);
+    }
     return true;
-  }), [transactions, timeFilter, dateSearch]);
+  }), [transactions, filterMode, selectedDate, selectedMonth]);
 
   const parseTransactionData = (t: Transaction) => {
     let namaPembeli = '-';
@@ -232,12 +237,13 @@ const Finance = () => {
 
   const executeExport = () => {
     if (!exportConfirm) return;
+    const periodName = filterMode === 'all' ? 'semua' : filterMode === 'daily' ? selectedDate : selectedMonth;
     if (exportConfirm.type === 'CSV') {
-      exportToCSV(`keuangan_vrimae_${timeFilter}`, prepareExportData(filteredTransactions));
+      exportToCSV(`keuangan_vrimae_${periodName}`, prepareExportData(filteredTransactions));
       showToast('success', 'Export Berhasil', `${filteredTransactions.length} transaksi diekspor ke CSV`);
     } else {
       exportToExcelAdvanced(
-        `laporan_vrimae_${timeFilter}`,
+        `laporan_vrimae_${periodName}`,
         prepareExportData(filteredTransactions),
         products
       );
@@ -260,21 +266,45 @@ const Finance = () => {
           <p className="page-subtitle">Kelola pemasukan dan pengeluaran</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="filter-group">
-            <button className={`filter-chip ${timeFilter === 'all' ? 'active' : ''}`} onClick={() => setTimeFilter('all')}>Semua</button>
-            <button className={`filter-chip ${timeFilter === 'week' ? 'active' : ''}`} onClick={() => setTimeFilter('week')}>Minggu</button>
-            <button className={`filter-chip ${timeFilter === 'month' ? 'active' : ''}`} onClick={() => setTimeFilter('month')}>Bulan</button>
-          </div>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Calendar size={16} style={{ position: 'absolute', left: '0.75rem', color: 'var(--color-primary)', pointerEvents: 'none' }} />
-            <input 
-              type="date" 
-              value={dateSearch} 
-              onChange={(e) => setDateSearch(e.target.value)}
-              className="form-input" 
-              style={{ padding: '0.6rem 0.6rem 0.6rem 2.2rem', width: 'auto', minWidth: '150px', cursor: 'pointer', borderColor: dateSearch ? 'var(--color-primary)' : 'var(--color-border)' }}
-              title="Cari berdasarkan tanggal"
-            />
+          <div className="filter-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <select 
+              className="form-select" 
+              value={filterMode} 
+              onChange={e => setFilterMode(e.target.value as any)}
+              style={{ width: 'auto', padding: '0.4rem 2rem 0.4rem 0.8rem', minWidth: '140px' }}
+            >
+              <option value="all">Semua Waktu</option>
+              <option value="daily">Harian</option>
+              <option value="monthly">Bulanan</option>
+            </select>
+            
+            {filterMode === 'daily' && (
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <Calendar size={16} style={{ position: 'absolute', left: '0.75rem', color: 'var(--color-primary)', pointerEvents: 'none' }} />
+                <input 
+                  type="date" 
+                  value={selectedDate} 
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="form-input" 
+                  style={{ padding: '0.4rem 0.6rem 0.4rem 2.2rem', width: 'auto', minWidth: '150px', cursor: 'pointer', borderColor: 'var(--color-primary)' }}
+                  title="Pilih Tanggal"
+                />
+              </div>
+            )}
+            
+            {filterMode === 'monthly' && (
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <Calendar size={16} style={{ position: 'absolute', left: '0.75rem', color: 'var(--color-primary)', pointerEvents: 'none' }} />
+                <input 
+                  type="month" 
+                  value={selectedMonth} 
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="form-input" 
+                  style={{ padding: '0.4rem 0.6rem 0.4rem 2.2rem', width: 'auto', minWidth: '150px', cursor: 'pointer', borderColor: 'var(--color-primary)' }}
+                  title="Pilih Bulan"
+                />
+              </div>
+            )}
           </div>
           <button className="btn btn-outline" onClick={handleExportCSV}><Download size={14} /> CSV</button>
           <button className="btn btn-outline" onClick={handleExportExcel}><Download size={14} /> Excel</button>
