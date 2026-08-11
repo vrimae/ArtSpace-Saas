@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { Plus, Download, Pencil, Trash2, Calendar, X } from 'lucide-react';
 import { useToast } from './Toast';
 import { formatCurrencyInput } from '../utils/currencyInput';
-import { safeParseDate, safeFormatDate } from '../utils/format';
+import { safeFormatDate } from '../utils/format';
 
 const Finance = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
