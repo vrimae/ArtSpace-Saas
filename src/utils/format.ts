@@ -13,15 +13,20 @@ export const safeParseDate = (dateVal: any): Date => {
   let d = new Date(str);
   if (!isNaN(d.getTime())) return d;
 
-  // iOS Safari specific fallbacks:
-  // 1. Replace SQL style spaces between date and time with 'T' (e.g., 2026-08-06 14:00:00 -> 2026-08-06T14:00:00)
+  // iOS Safari older versions choke on milliseconds in ISO strings
+  let cleanIso = str.replace(/\.\d+/, ''); 
+  d = new Date(cleanIso);
+  if (!isNaN(d.getTime())) return d;
+  
+  // Replace SQL style spaces between date and time with 'T'
   if (str.includes(' ') && !str.includes('T')) {
     d = new Date(str.replace(' ', 'T'));
     if (!isNaN(d.getTime())) return d;
   }
 
-  // 2. Replace hyphens with slashes (iOS WebKit always parses YYYY/MM/DD reliably)
-  d = new Date(str.replace(/-/g, '/').replace('T', ' '));
+  // Fallback: strip T and timezone, replace hyphens with slashes for bulletproof local parsing
+  let cleanLocal = cleanIso.replace('T', ' ').replace(/Z|[+-]\d{2}:\d{2}$/g, '');
+  d = new Date(cleanLocal.replace(/-/g, '/'));
   if (!isNaN(d.getTime())) return d;
 
   return new Date(); // Fallback agar rendering React di iOS tidak pernah mengalami crash / blank

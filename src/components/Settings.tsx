@@ -183,6 +183,30 @@ const Settings = () => {
     }
   };
 
+  const handleRestoreCategories = async () => {
+    if (loading) return;
+    if (window.confirm("Fitur ini akan memindai semua produk Anda dan memulihkan kategori yang hilang. Lanjutkan?")) {
+      setLoading(true);
+      try {
+        const { data: items } = await supabase.from('items').select('category');
+        if (items && items.length > 0) {
+          const usedCategories = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
+          const currentCategories = Array.isArray(categories) ? categories : [];
+          const merged = Array.from(new Set([...currentCategories, ...usedCategories, 'Umum'])) as string[];
+          await saveCategories(merged, "Admin", "Pemulihan Kategori Manual");
+          setCategories(merged);
+          showToast('success', 'Berhasil', 'Kategori berhasil dipulihkan dari data produk.');
+        } else {
+          showToast('info', 'Info', 'Tidak ditemukan kategori pada produk Anda.');
+        }
+      } catch (err) {
+        showToast('error', 'Gagal', 'Terjadi kesalahan saat memulihkan kategori.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const toggleTheme = () => {
     const nextTheme = !isDarkMode;
     setIsDarkMode(nextTheme);
@@ -880,8 +904,11 @@ const Settings = () => {
                 onChange={e => setNewCategory(e.target.value)}
                 style={{ flex: 1 }}
               />
-              <button type="submit" className="btn btn-primary" style={{ padding: '0 1rem', flexShrink: 0 }}>
+              <button type="submit" className="btn btn-primary" style={{ padding: '0 1rem', flexShrink: 0 }} disabled={loading || categories === null}>
                 <Plus size={18} /> Tambah
+              </button>
+              <button type="button" onClick={handleRestoreCategories} className="btn btn-secondary" style={{ padding: '0 1rem', flexShrink: 0 }} disabled={loading}>
+                Pulihkan
               </button>
             </div>
           </form>

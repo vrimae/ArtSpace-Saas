@@ -294,16 +294,37 @@ const Finance = () => {
             )}
             
             {filterMode === 'monthly' && (
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <Calendar size={16} style={{ position: 'absolute', left: '0.75rem', color: 'var(--color-primary)', pointerEvents: 'none' }} />
-                <input 
-                  type="month" 
-                  value={selectedMonth} 
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="form-input" 
-                  style={{ padding: '0.4rem 0.6rem 0.4rem 2.2rem', width: 'auto', minWidth: '150px', cursor: 'pointer', borderColor: 'var(--color-primary)' }}
-                  title="Pilih Bulan"
-                />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <select 
+                  className="form-select" 
+                  value={selectedMonth.split('-')[1] || '01'} 
+                  onChange={(e) => setSelectedMonth(`${selectedMonth.split('-')[0] || new Date().getFullYear()}-${e.target.value}`)}
+                  style={{ width: 'auto', padding: '0.4rem 2rem 0.4rem 0.8rem', cursor: 'pointer', borderColor: 'var(--color-primary)' }}
+                >
+                  <option value="01">Januari</option>
+                  <option value="02">Februari</option>
+                  <option value="03">Maret</option>
+                  <option value="04">April</option>
+                  <option value="05">Mei</option>
+                  <option value="06">Juni</option>
+                  <option value="07">Juli</option>
+                  <option value="08">Agustus</option>
+                  <option value="09">September</option>
+                  <option value="10">Oktober</option>
+                  <option value="11">November</option>
+                  <option value="12">Desember</option>
+                </select>
+                <select 
+                  className="form-select" 
+                  value={selectedMonth.split('-')[0] || new Date().getFullYear().toString()} 
+                  onChange={(e) => setSelectedMonth(`${e.target.value}-${selectedMonth.split('-')[1] || '01'}`)}
+                  style={{ width: 'auto', padding: '0.4rem 2rem 0.4rem 0.8rem', cursor: 'pointer', borderColor: 'var(--color-primary)' }}
+                >
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                </select>
               </div>
             )}
           </div>
