@@ -143,7 +143,7 @@ const Settings = () => {
   };
 
   const handleSaveEditCategory = async (index: number) => {
-    if (loading) return;
+    if (loading || !categories) return;
     try {
       const trimmed = editCategoryValue.trim();
       if (!trimmed || categories[index] === trimmed) {
@@ -168,7 +168,7 @@ const Settings = () => {
   };
 
   const handleDeleteCategory = async (index: number) => {
-    if (loading) return;
+    if (loading || !categories) return;
     const confirmed = window.confirm('Hapus kategori ini? Pastikan tidak ada produk/barang yang sedang menggunakannya.');
     if (!confirmed) return;
     
@@ -930,7 +930,7 @@ const Settings = () => {
                 )}
               </div>
             ))}
-            {categories.length === 0 && (
+            {categories && categories.length === 0 && (
               <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
                 Belum ada kategori.
               </div>
