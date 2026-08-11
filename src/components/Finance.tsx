@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { getTransactions, addTransaction, updateTransaction, deleteTransaction, getProducts } from '../utils/storage';
 import { exportToCSV, exportToExcelAdvanced } from '../utils/export';
 import type { Transaction, Product } from '../types';
-import { format, isThisWeek, isThisMonth } from 'date-fns';
+import { format } from 'date-fns';
 import { Plus, Download, Pencil, Trash2, Calendar, X } from 'lucide-react';
 import { useToast } from './Toast';
 import { formatCurrencyInput } from '../utils/currencyInput';
-import { safeParseDate, safeFormatDate } from '../utils/format';
+import { safeFormatDate } from '../utils/format';
 
 const Finance = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
