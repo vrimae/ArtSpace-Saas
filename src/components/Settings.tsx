@@ -103,7 +103,7 @@ const Settings = () => {
           telegramChatId: user.user_metadata?.telegram_chat_id || '',
           geminiApiKey: user.user_metadata?.gemini_api_key || '',
           waGatewayToken: user.user_metadata?.wa_gateway_token || defaultWaToken,
-          waGatewayUrl: (user.user_metadata?.wa_gateway_url && !user.user_metadata?.wa_gateway_url.includes('api.fonnte.com')) ? user.user_metadata?.wa_gateway_url : '/api/fonnte/send',
+          waGatewayUrl: (user.user_metadata?.wa_gateway_url === 'https://api.fonnte.com/send') ? '/api/fonnte/send' : (user.user_metadata?.wa_gateway_url || '/api/fonnte/send'),
           waGatewayProvider: user.user_metadata?.wa_gateway_provider || 'fonnte',
           waGatewayNumberKey: user.user_metadata?.wa_gateway_number_key || '',
           waCustomTemplate: user.user_metadata?.wa_custom_template || '',

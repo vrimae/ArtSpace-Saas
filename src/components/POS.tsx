@@ -372,7 +372,7 @@ const POS = () => {
         const defaultWaToken = isSuperAdmin ? 'SbmGAc1TxotP4TGuCGpS' : '';
         setWaGatewayConfig({
           token: user.user_metadata.wa_gateway_token || defaultWaToken,
-          url: (user.user_metadata?.wa_gateway_url && !user.user_metadata?.wa_gateway_url.includes('api.fonnte.com')) ? user.user_metadata?.wa_gateway_url : '/api/fonnte/send',
+          url: (user.user_metadata?.wa_gateway_url === 'https://api.fonnte.com/send') ? '/api/fonnte/send' : (user.user_metadata?.wa_gateway_url || '/api/fonnte/send'),
           provider: user.user_metadata.wa_gateway_provider || 'fonnte',
           numberKey: user.user_metadata.wa_gateway_number_key || '',
           customTemplate: user.user_metadata.wa_custom_template || '',
