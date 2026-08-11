@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { Plus, Download, Pencil, Trash2, Calendar, X } from 'lucide-react';
 import { useToast } from './Toast';
 import { formatCurrencyInput } from '../utils/currencyInput';
-import { safeFormatDate } from '../utils/format';
+import { safeParseDate, safeFormatDate } from '../utils/format';
 
 const Finance = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -155,12 +155,13 @@ const Finance = () => {
     if (!t) return false;
     if (filterMode === 'all') return true;
     
-    const tDateStr = String(t?.date || '');
     if (filterMode === 'daily') {
-      return tDateStr.startsWith(selectedDate);
+      const localDateStr = safeFormatDate(t?.date, 'yyyy-MM-dd');
+      return localDateStr === selectedDate;
     }
     if (filterMode === 'monthly') {
-      return tDateStr.startsWith(selectedMonth);
+      const localMonthStr = safeFormatDate(t?.date, 'yyyy-MM');
+      return localMonthStr === selectedMonth;
     }
     return true;
   }), [transactions, filterMode, selectedDate, selectedMonth]);
