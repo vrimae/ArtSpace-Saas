@@ -1,4 +1,4 @@
-import { format as dateFnsFormat, isValid } from 'date-fns';
+import { format as dateFnsFormat, isValid, parseISO } from 'date-fns';
 
 export const formatCurrency = (amount?: number) => {
   if (amount == null || isNaN(amount)) return 'Rp 0';
@@ -10,23 +10,24 @@ export const safeParseDate = (dateVal: any): Date => {
   if (dateVal instanceof Date) return isNaN(dateVal.getTime()) ? new Date() : dateVal;
   
   let str = String(dateVal).trim();
-  let d = new Date(str);
+  
+  // 1. Use date-fns parseISO (bulletproof across all browsers, ignores Safari bugs)
+  let d = parseISO(str);
+  if (isValid(d) && !isNaN(d.getTime())) return d;
+
+  // 2. Native Date constructor
+  d = new Date(str);
   if (!isNaN(d.getTime())) return d;
 
-  // iOS Safari older versions choke on milliseconds in ISO strings
-  let cleanIso = str.replace(/\.\d+/, ''); 
-  d = new Date(cleanIso);
-  if (!isNaN(d.getTime())) return d;
-  
-  // Replace SQL style spaces between date and time with 'T'
+  // 3. Handle SQL format (YYYY-MM-DD HH:mm:ss) by injecting 'T'
   if (str.includes(' ') && !str.includes('T')) {
     d = new Date(str.replace(' ', 'T'));
     if (!isNaN(d.getTime())) return d;
   }
 
-  // Fallback: strip T and timezone, replace hyphens with slashes for bulletproof local parsing
-  let cleanLocal = cleanIso.replace('T', ' ').replace(/Z|[+-]\d{2}:\d{2}$/g, '');
-  d = new Date(cleanLocal.replace(/-/g, '/'));
+  // 4. Ultimate iOS Safari fallback: strip timezone/milliseconds and use YYYY/MM/DD HH:mm:ss
+  let cleanLocal = str.substring(0, 19).replace('T', ' ').replace(/-/g, '/');
+  d = new Date(cleanLocal);
   if (!isNaN(d.getTime())) return d;
 
   return new Date(); // Fallback agar rendering React di iOS tidak pernah mengalami crash / blank
