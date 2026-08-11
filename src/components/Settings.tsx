@@ -76,7 +76,7 @@ const Settings = () => {
 
 
 
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[] | null>(null);
   const [newCategory, setNewCategory] = useState('');
   const [editingCategoryIndex, setEditingCategoryIndex] = useState<number | null>(null);
   const [editCategoryValue, setEditCategoryValue] = useState('');
@@ -115,7 +115,10 @@ const Settings = () => {
 
   const handleAddCategory = async (e?: React.SyntheticEvent) => {
     if (e) e.preventDefault();
-    if (loading) return;
+    if (loading || categories === null) {
+      showToast('error', 'Tunggu Sebentar', 'Sedang memuat data kategori dari server...');
+      return;
+    }
     setLoading(true);
     try {
       const trimmed = newCategory.trim();
@@ -884,7 +887,7 @@ const Settings = () => {
           </form>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {categories.map((cat, index) => (
+            {(categories || []).map((cat, index) => (
               <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--color-surface-alt)', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
                 {editingCategoryIndex === index ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>

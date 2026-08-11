@@ -492,10 +492,30 @@ export const initStorage = () => {
 export const getCategories = async (): Promise<string[]> => {
   const user = await getUser();
   if (!user) return [];
-  if (user.user_metadata?.product_categories) {
-    return user.user_metadata.product_categories;
+  let categories = user.user_metadata?.product_categories || [];
+
+  // Auto-restore logic: if categories array is suspiciously small, scan the items table
+  if (categories.length <= 1) {
+    try {
+      const { data: items } = await supabase.from('items').select('category');
+      if (items && items.length > 0) {
+        const usedCategories = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
+        if (usedCategories.length > categories.length) {
+          categories = Array.from(new Set([...categories, ...usedCategories, 'Umum']));
+          // Silently repair user_metadata in background
+          await supabase.auth.updateUser({
+            data: { product_categories: categories }
+          });
+          // Invalidate cached user to ensure next fetch is correct
+          cachedUser = null;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to auto-restore categories', e);
+    }
   }
-  return ['Umum'];
+
+  return categories.length > 0 ? categories : ['Umum'];
 };
 
 export const getAddOns = async (): Promise<any[]> => {
