@@ -24,6 +24,7 @@ const POList = () => {
     description: '',
     poTotalAmount: 0,
     poDpAmount: 0,
+    paymentMethod: 'Tunai'
   });
   const { showToast } = useToast();
 
@@ -161,6 +162,7 @@ const POList = () => {
       description: tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:\s*/i, ''),
       poTotalAmount: tx.poTotalAmount || tx.amount,
       poDpAmount: tx.poDpAmount !== undefined ? tx.poDpAmount : tx.amount,
+      paymentMethod: 'Tunai'
     });
     setEditModal({ isOpen: true, tx });
   };
@@ -178,7 +180,7 @@ const POList = () => {
           type: 'income',
           amount: dpDifference,
           category: 'Penjualan',
-          description: `[Tambahan DP] PO: ${editData.customerName || 'Umum'}`,
+          description: `[${editData.paymentMethod}] [Tambahan DP] PO: ${editData.customerName || 'Umum'}`,
           date: new Date().toISOString()
         }, 'Admin', 'Mencatat tambahan DP PO');
       } else if (dpDifference < 0) {
@@ -433,6 +435,46 @@ const POList = () => {
                   />
                   <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>Jika Anda menambah jumlah DP, selisihnya akan otomatis dicatat sebagai Pemasukan (Tambahan DP) di hari ini.</p>
                 </div>
+                {editModal.tx && (editData.poDpAmount - (editModal.tx.poDpAmount !== undefined ? editModal.tx.poDpAmount : editModal.tx.amount)) > 0 && (
+                  <div style={{ padding: '1rem', background: 'var(--color-surface-alt)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                    <label className="form-label" style={{ marginBottom: '0.75rem', display: 'block' }}>Metode Pembayaran (Untuk Rp {(editData.poDpAmount - (editModal.tx.poDpAmount !== undefined ? editModal.tx.poDpAmount : editModal.tx.amount)).toLocaleString('id-ID')})</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                      {['Tunai', 'QRIS', 'Transfer'].map(method => (
+                        <button
+                          key={method}
+                          onClick={() => setEditData({ ...editData, paymentMethod: method })}
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '8px',
+                            border: `2px solid ${editData.paymentMethod === method ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            background: editData.paymentMethod === method ? 'rgba(236, 72, 153, 0.1)' : 'var(--color-surface)',
+                            color: editData.paymentMethod === method ? 'var(--color-primary)' : 'var(--color-text)',
+                            fontWeight: 600,
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          {method}
+                        </button>
+                      ))}
+                    </div>
+                    {editData.paymentMethod === 'QRIS' && qrisString && (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '1.25rem', animation: 'fadeIn 0.3s ease-out' }}>
+                        <div style={{ padding: '0.75rem', background: '#fff', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                          <QRCodeSVG 
+                            value={generateDynamicQRIS(qrisString, (editData.poDpAmount - (editModal.tx.poDpAmount !== undefined ? editModal.tx.poDpAmount : editModal.tx.amount)))} 
+                            size={160}
+                            level="M" 
+                            includeMargin={false}
+                            style={{ display: 'block', borderRadius: '8px' }}
+                          />
+                        </div>
+                        <p className="text-sm text-secondary" style={{ marginTop: '0.75rem', textAlign: 'center', fontWeight: 600 }}>
+                          Scan QRIS untuk membayar Rp {(editData.poDpAmount - (editModal.tx.poDpAmount !== undefined ? editModal.tx.poDpAmount : editModal.tx.amount)).toLocaleString('id-ID')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button className="btn btn-primary w-full" onClick={handleSaveEdit}>Simpan Perubahan</button>
               </div>
             </div>
