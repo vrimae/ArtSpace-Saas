@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useMemo } from 'react';
 import { AuthContext } from '../App';
 import { getTransactions, updateTransaction, addTransaction, getUser, deleteTransaction } from '../utils/storage';
 import { safeFormatDate } from '../utils/format';
@@ -268,15 +268,17 @@ const POList = () => {
     window.open(url, '_blank');
   };
 
-  const filteredPOs = transactions.filter(t => {
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      if (!t.customerName?.toLowerCase().includes(q) && !t.description.toLowerCase().includes(q)) {
-        return false;
+  const filteredPOs = useMemo(() => {
+    return transactions.filter(t => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (!t.customerName?.toLowerCase().includes(q) && !t.description.toLowerCase().includes(q)) {
+          return false;
+        }
       }
-    }
-    return true;
-  });
+      return true;
+    });
+  }, [transactions, searchQuery]);
 
   const formatCurrency = (amount: number) => {
     return 'Rp ' + amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -387,7 +389,7 @@ const POList = () => {
       </div>
       {editModal.isOpen && editModal.tx && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal-content" style={{ maxWidth: '450px' }}>
             <div className="modal-header">
               <h3 className="text-xl font-bold">Edit Pre-Order (PO)</h3>
               <button onClick={() => setEditModal({ isOpen: false, tx: null })} className="btn-icon"><X size={20} /></button>
@@ -438,7 +440,7 @@ const POList = () => {
                 {editModal.tx && (editData.poDpAmount - (editModal.tx.poDpAmount !== undefined ? editModal.tx.poDpAmount : editModal.tx.amount)) > 0 && (
                   <div style={{ padding: '1rem', background: 'var(--color-surface-alt)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
                     <label className="form-label" style={{ marginBottom: '0.75rem', display: 'block' }}>Metode Pembayaran (Untuk Rp {(editData.poDpAmount - (editModal.tx.poDpAmount !== undefined ? editModal.tx.poDpAmount : editModal.tx.amount)).toLocaleString('id-ID')})</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '0.5rem' }}>
                       {['Tunai', 'QRIS', 'Transfer'].map(method => (
                         <button
                           key={method}
@@ -500,7 +502,7 @@ const POList = () => {
               
               <div style={{ marginBottom: '1.5rem' }}>
                 <label className="form-label">Metode Pembayaran</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '0.5rem' }}>
                   {['Tunai', 'QRIS', 'Transfer'].map(method => (
                     <button
                       key={method}
