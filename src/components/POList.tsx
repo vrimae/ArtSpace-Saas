@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext, useMemo } from 'react';
 import { AuthContext } from '../App';
-import { getTransactions, updateTransaction, addTransaction, getUser, deleteTransaction } from '../utils/storage';
+import { getTransactions, updateTransaction, addTransaction, getUser } from '../utils/storage';
 import { safeFormatDate } from '../utils/format';
 import { CheckCircle2, Clock, Search, MessageCircle, X, Pencil, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';

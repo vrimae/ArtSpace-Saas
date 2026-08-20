@@ -7,7 +7,7 @@ export interface Transaction {
   category: string;
   description: string;
   date: string; // ISO string
-  poStatus?: 'pending' | 'selesai';
+  poStatus?: 'pending' | 'selesai' | 'batal';
   poPickupDate?: string;
   customerName?: string;
   customerPhone?: string;
