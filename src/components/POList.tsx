@@ -214,25 +214,13 @@ const POList = () => {
   };
 
   const handleDeletePO = async (tx: Transaction) => {
-    if (confirm(`Apakah Anda yakin ingin membatalkan dan MENGHAPUS PO dari ${tx.customerName || 'Pelanggan'}? Semua catatan DP (termasuk tambahan DP) akan ikut terhapus dari Keuangan.`)) {
+    if (confirm(`Apakah Anda yakin ingin membatalkan PO dari ${tx.customerName || 'Pelanggan'}? (Uang DP akan dianggap hangus dan tetap masuk ke catatan Keuangan)`)) {
       try {
-        await deleteTransaction(tx.id, 'Admin', 'Pembatalan PO oleh pengguna');
-        
-        const allTx = await getTransactions(500, 0);
-        const customerNameStr = tx.customerName || 'Umum';
-        const relatedDPs = allTx.filter(t => 
-          t.description.includes(`[Tambahan DP] PO: ${customerNameStr}`) || 
-          t.description.includes(`[Refund/Kurang DP] PO: ${customerNameStr}`)
-        );
-        
-        for (const related of relatedDPs) {
-          await deleteTransaction(related.id, 'Admin', 'Penghapusan otomatis DP tambahan karena PO dihapus');
-        }
-
-        showToast('success', 'Berhasil', 'PO dan riwayat DP tambahannya berhasil dihapus.');
+        await updateTransaction(tx.id, { poStatus: 'batal' }, 'Admin', 'Pembatalan PO (DP Hangus)');
+        showToast('success', 'Berhasil', 'PO dibatalkan. Uang DP tetap tersimpan di Keuangan.');
         fetchPOs();
       } catch (err) {
-        showToast('error', 'Gagal', 'Tidak dapat menghapus PO sepenuhnya.');
+        showToast('error', 'Gagal', 'Tidak dapat membatalkan PO.');
       }
     }
   };
@@ -341,7 +329,7 @@ const POList = () => {
                 <tr><td colSpan={7} className="text-center text-muted p-6 text-sm">Tidak ada daftar PO ditemukan.</td></tr>
               ) : (
                 filteredPOs.map(t => (
-                  <tr key={t.id} style={{ opacity: t.poStatus === 'selesai' ? 0.6 : 1 }}>
+                  <tr key={t.id} style={{ opacity: (t.poStatus === 'selesai' || t.poStatus === 'batal') ? 0.6 : 1 }}>
                     <td className="text-sm text-secondary">{safeFormatDate(t.date, 'dd MMM yyyy')}</td>
                     <td className="text-sm font-bold text-primary">
                       {t.poPickupDate ? safeFormatDate(t.poPickupDate, 'dd MMM yyyy, HH:mm') : '-'}
@@ -364,6 +352,8 @@ const POList = () => {
                     <td>
                       {t.poStatus === 'pending' ? (
                         <span className="badge" style={{ background: 'var(--color-warning)', color: '#fff' }}><Clock size={12} style={{ display: 'inline', marginRight: 4 }} /> Menunggu</span>
+                      ) : t.poStatus === 'batal' ? (
+                        <span className="badge" style={{ background: '#EF4444', color: '#fff' }}><X size={12} style={{ display: 'inline', marginRight: 4 }} /> Batal</span>
                       ) : (
                         <span className="badge" style={{ background: '#22C55E', color: '#fff' }}><CheckCircle2 size={12} style={{ display: 'inline', marginRight: 4 }} /> Selesai</span>
                       )}
