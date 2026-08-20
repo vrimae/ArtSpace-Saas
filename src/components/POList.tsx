@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getTransactions, updateTransaction, addTransaction, getUser } from '../utils/storage';
+import { getTransactions, updateTransaction, addTransaction, getUser, deleteTransaction } from '../utils/storage';
 import { safeFormatDate } from '../utils/format';
-import { CheckCircle2, Clock, Search, MessageCircle, X } from 'lucide-react';
+import { CheckCircle2, Clock, Search, MessageCircle, X, Pencil, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateDynamicQRIS } from '../utils/qris';
 import { useToast } from './Toast';
@@ -14,6 +14,15 @@ const POList = () => {
   const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: '/api/fonnte/send', provider: 'fonnte', numberKey: '', customTemplate: '', shopName: 'Vrimae' });
   const [qrisString, setQrisString] = useState('');
   const [settleModal, setSettleModal] = useState<{ isOpen: boolean; tx: Transaction | null; sisa: number; paymentMethod: string }>({ isOpen: false, tx: null, sisa: 0, paymentMethod: 'Tunai' });
+  const [editModal, setEditModal] = useState<{ isOpen: boolean; tx: Transaction | null }>({ isOpen: false, tx: null });
+  const [editData, setEditData] = useState({
+    customerName: '',
+    customerPhone: '',
+    poPickupDate: '',
+    description: '',
+    poTotalAmount: 0,
+    poDpAmount: 0,
+  });
   const { showToast } = useToast();
 
   const fetchPOs = async () => {
@@ -138,6 +147,76 @@ const POList = () => {
         } catch {
           showToast('error', 'Gagal', 'Tidak dapat mengupdate status PO.');
         }
+      }
+    }
+  };
+
+  const handleEditClick = (tx: Transaction) => {
+    setEditData({
+      customerName: tx.customerName || '',
+      customerPhone: tx.customerPhone || '',
+      poPickupDate: tx.poPickupDate ? safeFormatDate(tx.poPickupDate, "yyyy-MM-dd'T'HH:mm") : '',
+      description: tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:\s*/i, ''),
+      poTotalAmount: tx.poTotalAmount || tx.amount,
+      poDpAmount: tx.poDpAmount !== undefined ? tx.poDpAmount : tx.amount,
+    });
+    setEditModal({ isOpen: true, tx });
+  };
+
+  const handleSaveEdit = async () => {
+    const tx = editModal.tx;
+    if (!tx) return;
+    
+    const oldDp = tx.poDpAmount !== undefined ? tx.poDpAmount : tx.amount;
+    const dpDifference = editData.poDpAmount - oldDp;
+
+    try {
+      if (dpDifference > 0) {
+        await addTransaction({
+          type: 'income',
+          amount: dpDifference,
+          category: 'Penjualan',
+          description: `[Tambahan DP] PO: ${editData.customerName || 'Umum'}`,
+          date: new Date().toISOString()
+        }, 'Admin', 'Mencatat tambahan DP PO');
+      } else if (dpDifference < 0) {
+        await addTransaction({
+          type: 'expense',
+          amount: Math.abs(dpDifference),
+          category: 'Pengembalian',
+          description: `[Refund/Kurang DP] PO: ${editData.customerName || 'Umum'}`,
+          date: new Date().toISOString()
+        }, 'Admin', 'Pengembalian kelebihan DP PO');
+      }
+
+      const formattedDate = editData.poPickupDate ? safeFormatDate(editData.poPickupDate, 'dd MMM, HH:mm') : '-';
+      const formattedDesc = `[PO|${formattedDate}] Pesanan: ${editData.customerName || 'Umum'} - ${editData.description}`;
+
+      await updateTransaction(tx.id, {
+        customerName: editData.customerName,
+        customerPhone: editData.customerPhone,
+        poPickupDate: editData.poPickupDate ? new Date(editData.poPickupDate).toISOString() : undefined,
+        description: formattedDesc,
+        poTotalAmount: editData.poTotalAmount,
+        poDpAmount: editData.poDpAmount,
+      }, 'Admin', 'Mengupdate data PO');
+
+      showToast('success', 'Berhasil', 'Data PO berhasil diperbarui.');
+      setEditModal({ isOpen: false, tx: null });
+      fetchPOs();
+    } catch (err) {
+      showToast('error', 'Gagal', 'Terjadi kesalahan saat menyimpan perubahan.');
+    }
+  };
+
+  const handleDeletePO = async (tx: Transaction) => {
+    if (confirm(`Apakah Anda yakin ingin membatalkan dan MENGHAPUS PO dari ${tx.customerName || 'Pelanggan'}?`)) {
+      try {
+        await deleteTransaction(tx.id, 'Admin', 'Pembatalan PO oleh pengguna');
+        showToast('success', 'Berhasil', 'PO berhasil dihapus / dibatalkan.');
+        fetchPOs();
+      } catch (err) {
+        showToast('error', 'Gagal', 'Tidak dapat menghapus PO.');
       }
     }
   };
@@ -274,13 +353,23 @@ const POList = () => {
                     <td>
                       <div className="flex items-center justify-center gap-2">
                         {t.poStatus === 'pending' && (
-                          <button className="btn-icon" onClick={() => handleCompletePO(t)} title="Tandai Selesai" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22C55E' }}>
-                            <CheckCircle2 size={16} />
-                          </button>
+                          <>
+                            <button className="btn-icon" onClick={() => handleCompletePO(t)} title="Tandai Selesai" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22C55E' }}>
+                              <CheckCircle2 size={16} />
+                            </button>
+                            <button className="btn-icon" onClick={() => handleEditClick(t)} title="Edit PO" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3B82F6' }}>
+                              <Pencil size={16} />
+                            </button>
+                          </>
                         )}
                         <button className="btn-icon" onClick={() => handleChat(t)} title="Hubungi WA" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22C55E' }}>
                           <MessageCircle size={16} />
                         </button>
+                        {t.poStatus === 'pending' && (
+                          <button className="btn-icon" onClick={() => handleDeletePO(t)} title="Hapus PO" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -290,6 +379,46 @@ const POList = () => {
           </table>
         </div>
       </div>
+      {editModal.isOpen && editModal.tx && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h3 className="text-xl font-bold">Edit Pre-Order (PO)</h3>
+              <button onClick={() => setEditModal({ isOpen: false, tx: null })} className="btn-icon"><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label className="form-label">Nama Pelanggan</label>
+                  <input type="text" className="form-input" value={editData.customerName} onChange={e => setEditData({...editData, customerName: e.target.value})} />
+                </div>
+                <div>
+                  <label className="form-label">No. WA</label>
+                  <input type="tel" className="form-input" value={editData.customerPhone} onChange={e => setEditData({...editData, customerPhone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="form-label">Tgl Ambil</label>
+                  <input type="datetime-local" className="form-input" value={editData.poPickupDate} onChange={e => setEditData({...editData, poPickupDate: e.target.value})} />
+                </div>
+                <div>
+                  <label className="form-label">Detail Pesanan (Menu / Catatan)</label>
+                  <textarea className="form-input" rows={3} value={editData.description} onChange={e => setEditData({...editData, description: e.target.value})} />
+                </div>
+                <div>
+                  <label className="form-label">Total Harga PO</label>
+                  <input type="number" className="form-input" value={editData.poTotalAmount} onChange={e => setEditData({...editData, poTotalAmount: parseInt(e.target.value) || 0})} />
+                </div>
+                <div>
+                  <label className="form-label">DP yang Sudah Dibayar</label>
+                  <input type="number" className="form-input" value={editData.poDpAmount} onChange={e => setEditData({...editData, poDpAmount: parseInt(e.target.value) || 0})} />
+                  <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>Jika Anda menambah jumlah DP, selisihnya akan otomatis dicatat sebagai Pemasukan (Tambahan DP) di hari ini.</p>
+                </div>
+                <button className="btn btn-primary w-full" onClick={handleSaveEdit}>Simpan Perubahan</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {settleModal.isOpen && settleModal.tx && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '400px' }}>
