@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../App';
 import { getTransactions, updateTransaction, addTransaction, getUser, deleteTransaction } from '../utils/storage';
 import { safeFormatDate } from '../utils/format';
 import { CheckCircle2, Clock, Search, MessageCircle, X, Pencil, Trash2 } from 'lucide-react';
@@ -8,6 +9,7 @@ import { useToast } from './Toast';
 import type { Transaction } from '../types';
 
 const POList = () => {
+  const { isAdmin } = useContext(AuthContext);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -357,15 +359,17 @@ const POList = () => {
                             <button className="btn-icon" onClick={() => handleCompletePO(t)} title="Tandai Selesai" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22C55E' }}>
                               <CheckCircle2 size={16} />
                             </button>
-                            <button className="btn-icon" onClick={() => handleEditClick(t)} title="Edit PO" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3B82F6' }}>
-                              <Pencil size={16} />
-                            </button>
+                            {isAdmin && (
+                              <button className="btn-icon" onClick={() => handleEditClick(t)} title="Edit PO" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3B82F6' }}>
+                                <Pencil size={16} />
+                              </button>
+                            )}
                           </>
                         )}
                         <button className="btn-icon" onClick={() => handleChat(t)} title="Hubungi WA" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22C55E' }}>
                           <MessageCircle size={16} />
                         </button>
-                        {t.poStatus === 'pending' && (
+                        {isAdmin && t.poStatus === 'pending' && (
                           <button className="btn-icon" onClick={() => handleDeletePO(t)} title="Hapus PO" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
                             <Trash2 size={16} />
                           </button>
