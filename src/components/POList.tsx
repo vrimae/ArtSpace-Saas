@@ -214,13 +214,25 @@ const POList = () => {
   };
 
   const handleDeletePO = async (tx: Transaction) => {
-    if (confirm(`Apakah Anda yakin ingin membatalkan dan MENGHAPUS PO dari ${tx.customerName || 'Pelanggan'}?`)) {
+    if (confirm(`Apakah Anda yakin ingin membatalkan dan MENGHAPUS PO dari ${tx.customerName || 'Pelanggan'}? Semua catatan DP (termasuk tambahan DP) akan ikut terhapus dari Keuangan.`)) {
       try {
         await deleteTransaction(tx.id, 'Admin', 'Pembatalan PO oleh pengguna');
-        showToast('success', 'Berhasil', 'PO berhasil dihapus / dibatalkan.');
+        
+        const allTx = await getTransactions(500, 0);
+        const customerNameStr = tx.customerName || 'Umum';
+        const relatedDPs = allTx.filter(t => 
+          t.description.includes(`[Tambahan DP] PO: ${customerNameStr}`) || 
+          t.description.includes(`[Refund/Kurang DP] PO: ${customerNameStr}`)
+        );
+        
+        for (const related of relatedDPs) {
+          await deleteTransaction(related.id, 'Admin', 'Penghapusan otomatis DP tambahan karena PO dihapus');
+        }
+
+        showToast('success', 'Berhasil', 'PO dan riwayat DP tambahannya berhasil dihapus.');
         fetchPOs();
       } catch (err) {
-        showToast('error', 'Gagal', 'Tidak dapat menghapus PO.');
+        showToast('error', 'Gagal', 'Tidak dapat menghapus PO sepenuhnya.');
       }
     }
   };
