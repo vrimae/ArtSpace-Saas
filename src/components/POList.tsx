@@ -409,12 +409,28 @@ const POList = () => {
                   <textarea className="form-input" rows={3} value={editData.description} onChange={e => setEditData({...editData, description: e.target.value})} />
                 </div>
                 <div>
-                  <label className="form-label">Total Harga PO</label>
-                  <input type="number" className="form-input" value={editData.poTotalAmount} onChange={e => setEditData({...editData, poTotalAmount: parseInt(e.target.value) || 0})} />
+                  <label className="form-label">Total Harga PO (Rp)</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={editData.poTotalAmount === 0 ? '' : editData.poTotalAmount.toLocaleString('id-ID')} 
+                    onChange={e => {
+                      const val = parseInt(e.target.value.replace(/\D/g, ''));
+                      setEditData({...editData, poTotalAmount: isNaN(val) ? 0 : val});
+                    }} 
+                  />
                 </div>
                 <div>
-                  <label className="form-label">DP yang Sudah Dibayar</label>
-                  <input type="number" className="form-input" value={editData.poDpAmount} onChange={e => setEditData({...editData, poDpAmount: parseInt(e.target.value) || 0})} />
+                  <label className="form-label">DP yang Sudah Dibayar (Rp)</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={editData.poDpAmount === 0 ? '' : editData.poDpAmount.toLocaleString('id-ID')} 
+                    onChange={e => {
+                      const val = parseInt(e.target.value.replace(/\D/g, ''));
+                      setEditData({...editData, poDpAmount: isNaN(val) ? 0 : val});
+                    }} 
+                  />
                   <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>Jika Anda menambah jumlah DP, selisihnya akan otomatis dicatat sebagai Pemasukan (Tambahan DP) di hari ini.</p>
                 </div>
                 <button className="btn btn-primary w-full" onClick={handleSaveEdit}>Simpan Perubahan</button>
