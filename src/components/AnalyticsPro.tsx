@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { checkAnalyticsAccess, getTransactions, getInventory, getUser } from '../utils/storage';
+import { checkAnalyticsAccess, getTransactions, getInventory, getProducts, getUser } from '../utils/storage';
 import { supabase } from '../lib/supabase';
 import { Crown, Lock, TrendingUp, PackageOpen, ArrowDownRight, ArrowUpRight, ArrowRight, Wallet, Calendar, ChevronDown, Users } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import type { Transaction, InventoryItem } from '../types';
+import type { Transaction, InventoryItem, Product } from '../types';
 import { format, subDays, isAfter, startOfDay, isSameDay, startOfMonth, endOfMonth, subMonths, isSameMonth, startOfYear, endOfYear, subYears, isSameYear, parseISO, getWeekOfMonth } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -26,6 +26,7 @@ const AnalyticsPro = () => {
   const [isPro, setIsPro] = useState(false);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7days');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   
@@ -38,12 +39,14 @@ const AnalyticsPro = () => {
         
         if (proStatus) {
           const fetchInitial = async () => {
-            const [txs, inv] = await Promise.all([
+            const [txs, inv, prods] = await Promise.all([
               getTransactions(),
-              getInventory()
+              getInventory(),
+              getProducts()
             ]);
             setAllTransactions(txs);
             setInventory(inv);
+            setProducts(prods);
           };
           
           await fetchInitial();
@@ -269,11 +272,12 @@ const AnalyticsPro = () => {
           productMap[lowerName].qty += qty;
           
           // Category Tracking
-          const invItem = inventory.find(i => {
+          const prodItem = products.find(p => p.name.toLowerCase() === lowerName);
+          const invItem = !prodItem ? inventory.find(i => {
             const iName = i.name.toLowerCase();
             return iName === lowerName || iName.split('|||')[0] === lowerName;
-          });
-          const cat = invItem?.category || 'Lainnya';
+          }) : null;
+          const cat = prodItem?.category || invItem?.category || 'Lainnya';
           if (!categoryMap[cat]) categoryMap[cat] = 0;
           categoryMap[cat] += qty;
         }
