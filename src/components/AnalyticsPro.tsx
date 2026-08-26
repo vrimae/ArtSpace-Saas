@@ -249,12 +249,14 @@ const AnalyticsPro = () => {
     const parts = t.description.split(' - ');
     if (parts.length > 1) {
       const itemsStr = parts.slice(1).join(' - ');
-      const regex = /(.*?)\s*\((\d+)x\)(?:,\s*|$)/g;
+      const regex = /(?:^|,\s*)(.*?)\s*\((\d+)x\)/g;
       let match;
       while ((match = regex.exec(itemsStr)) !== null) {
         let namePart = match[1].trim();
         // Remove addons and extras formatting like (+Boba) or (?Es Sedikit)
-        namePart = namePart.replace(/\s*\(\+[^)]+\)/g, '').replace(/\s*\(\?[^)]+\)/g, '').trim();
+        namePart = namePart.replace(/\s*\(\+[^)]+\)/g, '').replace(/\s*\(\?[^)]+\)/g, '');
+        // Remove note formatting like [Catatan: xyz]
+        namePart = namePart.replace(/\s*\[Catatan:[^\]]+\]/g, '').trim();
         const qty = parseInt(match[2], 10);
         if (!isNaN(qty) && namePart) {
           productMap[namePart] = (productMap[namePart] || 0) + qty;
