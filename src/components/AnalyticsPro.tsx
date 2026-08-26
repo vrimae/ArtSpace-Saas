@@ -245,6 +245,8 @@ const AnalyticsPro = () => {
   // --- Top Products Logic ---
   // Parse descriptions: "[Tunai] Pesanan: Budi - Kopi Aren (+Boba) (2x), Matcha (1x)"
   const productMap: Record<string, { name: string, qty: number }> = {};
+  const categoryMap: Record<string, number> = {};
+  
   currentTransactions.filter(t => t.type === 'income' && t.description.includes('Pesanan:')).forEach(t => {
     const parts = t.description.split(' - ');
     if (parts.length > 1) {
@@ -259,37 +261,32 @@ const AnalyticsPro = () => {
         namePart = namePart.replace(/\s*\[Catatan:[^\]]+\]/g, '').trim();
         const qty = parseInt(match[2], 10);
         if (!isNaN(qty) && namePart) {
-          let lowerName = namePart.toLowerCase();
-          
-          // Normalize variations of bouquet
-          if (lowerName.includes('boquet') || lowerName.includes('bouquet') || lowerName.includes('buket') || lowerName.includes('bucket') || lowerName.includes('boquete')) {
-            lowerName = 'boquete';
-            namePart = 'Boquete';
-          }
+          const lowerName = namePart.toLowerCase();
           
           if (!productMap[lowerName]) {
             productMap[lowerName] = { name: namePart, qty: 0 };
           }
           productMap[lowerName].qty += qty;
+          
+          // Category Tracking
+          const invItem = inventory.find(i => {
+            const iName = i.name.toLowerCase();
+            return iName === lowerName || iName.split('|||')[0] === lowerName;
+          });
+          const cat = invItem?.category || 'Lainnya';
+          if (!categoryMap[cat]) categoryMap[cat] = 0;
+          categoryMap[cat] += qty;
         }
-      }
-    }
-    
-    // Fallback for manual transactions that mention boquete but lack the POS 'Pesanan:' format
-    if (!t.description.includes('Pesanan:') && !t.description.includes('Pelunasan PO') && !t.description.includes('Tambahan DP')) {
-      const lowerDesc = t.description.toLowerCase();
-      if (lowerDesc.includes('boquet') || lowerDesc.includes('bouquet') || lowerDesc.includes('buket') || lowerDesc.includes('bucket') || lowerDesc.includes('boquete')) {
-        const lowerName = 'boquete';
-        if (!productMap[lowerName]) productMap[lowerName] = { name: 'Boquete', qty: 0 };
-        // Extract a number if they typed something like "2x boquete" or "boquete 2", default to 1
-        const numMatch = lowerDesc.match(/(\d+)\s*(?:x|pcs|buah)?\s*(?:boquet|bouquet|buket|bucket|boquete)|(?:boquet|bouquet|buket|bucket|boquete)\s*(\d+)/);
-        const qty = numMatch ? parseInt(numMatch[1] || numMatch[2], 10) : 1;
-        productMap[lowerName].qty += qty;
       }
     }
   });
   
   const topProducts = Object.values(productMap)
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 5);
+    
+  const topCategories = Object.entries(categoryMap)
+    .map(([name, qty]) => ({ name, qty }))
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 5);
 
@@ -488,6 +485,32 @@ const AnalyticsPro = () => {
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', fontSize: '0.9rem', padding: '2rem 0' }}>
                 Belum ada produk terjual di periode ini.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Top Categories Bar Chart */}
+        <div style={{ background: 'var(--color-surface)', padding: '1.5rem', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', border: '1px solid var(--color-border-light)', overflow: 'hidden' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.5rem', color: 'var(--color-text)' }}>Kategori Terlaris ({timeFilter === 'today' ? 'Hari Ini' : timeFilter === '7days' ? '7 Hari Terakhir' : timeFilter === 'month' ? 'Bulan Ini' : 'Tahun Ini'})</h3>
+          <div style={{ width: '100%' }}>
+            {topCategories.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+                {topCategories.map((c, index) => (
+                  <div key={index}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '1rem' }}>{c.name}</span>
+                      <span style={{ color: 'var(--color-text-secondary)', flexShrink: 0 }}>{c.qty} Item</span>
+                    </div>
+                    <div style={{ width: '100%', height: '12px', background: 'var(--color-bg)', borderRadius: '6px', overflow: 'hidden' }}>
+                      <div style={{ width: `${(c.qty / topCategories[0].qty) * 100}%`, height: '100%', background: COLORS[index % COLORS.length], borderRadius: '6px', transition: 'width 1s ease-out' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', fontSize: '0.9rem', padding: '2rem 0' }}>
+                Belum ada kategori terjual di periode ini.
               </div>
             )}
           </div>
