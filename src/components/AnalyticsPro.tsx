@@ -244,8 +244,8 @@ const AnalyticsPro = () => {
 
   // --- Top Products Logic ---
   // Parse descriptions: "[Tunai] Pesanan: Budi - Kopi Aren (+Boba) (2x), Matcha (1x)"
-  const productMap: Record<string, number> = {};
-  currentTransactions.filter(t => t.type === 'income').forEach(t => {
+  const productMap: Record<string, { name: string, qty: number }> = {};
+  currentTransactions.filter(t => t.type === 'income' && t.description.includes('Pesanan:')).forEach(t => {
     const parts = t.description.split(' - ');
     if (parts.length > 1) {
       const itemsStr = parts.slice(1).join(' - ');
@@ -259,14 +259,17 @@ const AnalyticsPro = () => {
         namePart = namePart.replace(/\s*\[Catatan:[^\]]+\]/g, '').trim();
         const qty = parseInt(match[2], 10);
         if (!isNaN(qty) && namePart) {
-          productMap[namePart] = (productMap[namePart] || 0) + qty;
+          const lowerName = namePart.toLowerCase();
+          if (!productMap[lowerName]) {
+            productMap[lowerName] = { name: namePart, qty: 0 };
+          }
+          productMap[lowerName].qty += qty;
         }
       }
     }
   });
   
-  const topProducts = Object.entries(productMap)
-    .map(([name, qty]) => ({ name, qty }))
+  const topProducts = Object.values(productMap)
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 5);
 
