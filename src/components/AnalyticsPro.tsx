@@ -272,12 +272,15 @@ const AnalyticsPro = () => {
           productMap[lowerName].qty += qty;
           
           // Category Tracking
-          const prodItem = products.find(p => p.name.toLowerCase() === lowerName);
+          const cleanName = lowerName.trim();
+          const prodItem = products.find(p => p.name.toLowerCase().trim() === cleanName);
           const invItem = !prodItem ? inventory.find(i => {
             const iName = i.name.toLowerCase();
-            return iName === lowerName || iName.split('|||')[0] === lowerName;
+            return iName.trim() === cleanName || iName.split('|||')[0].trim() === cleanName;
           }) : null;
-          const cat = prodItem?.category || invItem?.category || 'Lainnya';
+          
+          // Fallback to 'Umum' instead of 'Lainnya' so it matches their default POS category
+          const cat = prodItem?.category || invItem?.category || 'Umum';
           if (!categoryMap[cat]) categoryMap[cat] = 0;
           categoryMap[cat] += qty;
         }
