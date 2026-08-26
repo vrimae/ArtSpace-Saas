@@ -259,12 +259,32 @@ const AnalyticsPro = () => {
         namePart = namePart.replace(/\s*\[Catatan:[^\]]+\]/g, '').trim();
         const qty = parseInt(match[2], 10);
         if (!isNaN(qty) && namePart) {
-          const lowerName = namePart.toLowerCase();
+          let lowerName = namePart.toLowerCase();
+          
+          // Normalize variations of bouquet
+          if (lowerName.includes('boquet') || lowerName.includes('bouquet') || lowerName.includes('buket') || lowerName.includes('bucket') || lowerName.includes('boquete')) {
+            lowerName = 'boquete';
+            namePart = 'Boquete';
+          }
+          
           if (!productMap[lowerName]) {
             productMap[lowerName] = { name: namePart, qty: 0 };
           }
           productMap[lowerName].qty += qty;
         }
+      }
+    }
+    
+    // Fallback for manual transactions that mention boquete but lack the POS 'Pesanan:' format
+    if (!t.description.includes('Pesanan:') && !t.description.includes('Pelunasan PO') && !t.description.includes('Tambahan DP')) {
+      const lowerDesc = t.description.toLowerCase();
+      if (lowerDesc.includes('boquet') || lowerDesc.includes('bouquet') || lowerDesc.includes('buket') || lowerDesc.includes('bucket') || lowerDesc.includes('boquete')) {
+        const lowerName = 'boquete';
+        if (!productMap[lowerName]) productMap[lowerName] = { name: 'Boquete', qty: 0 };
+        // Extract a number if they typed something like "2x boquete" or "boquete 2", default to 1
+        const numMatch = lowerDesc.match(/(\d+)\s*(?:x|pcs|buah)?\s*(?:boquet|bouquet|buket|bucket|boquete)|(?:boquet|bouquet|buket|bucket|boquete)\s*(\d+)/);
+        const qty = numMatch ? parseInt(numMatch[1] || numMatch[2], 10) : 1;
+        productMap[lowerName].qty += qty;
       }
     }
   });
