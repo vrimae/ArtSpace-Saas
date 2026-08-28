@@ -57,7 +57,7 @@ const POS = () => {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [editingMenuId, setEditingMenuId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
-  const [paymentMethod, setPaymentMethod] = useState<'Tunai' | 'QRIS' | 'DANA' | 'GoPay' | 'Non-Tunai'>('Tunai');
+  const [paymentMethod, setPaymentMethod] = useState<'Tunai' | 'QRIS' | 'DANA' | 'SeaBank' | 'Transfer' | 'Non-Tunai'>('Tunai');
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -655,7 +655,7 @@ const POS = () => {
     const totalAmount = calculateTotal();
     
     // QRIS Flow
-    if (['QRIS', 'DANA', 'GoPay'].includes(paymentMethod)) {
+    if (['QRIS', 'DANA', 'SeaBank'].includes(paymentMethod)) {
       if (!qrisString) {
         showToast('error', 'QRIS Belum Diatur', 'Silakan masukkan Teks Kode QRIS di halaman Pengaturan terlebih dahulu.');
         setIsSubmitting(false);
@@ -1317,7 +1317,7 @@ const POS = () => {
                 </div>
                 
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {['Tunai', 'QRIS', 'DANA', 'GoPay', 'Lainnya'].map(method => (
+                  {['Tunai', 'QRIS', 'DANA', 'SeaBank', 'Transfer', 'Lainnya'].map(method => (
                     <button 
                       key={method}
                       className={`btn ${paymentMethod === method ? 'btn-primary' : 'btn-outline'}`}
@@ -2096,8 +2096,8 @@ const POS = () => {
             <div style={{
               background: paymentMethod === 'DANA'
                 ? 'linear-gradient(135deg, #118EEA 0%, #0671C6 100%)'
-                : paymentMethod === 'GoPay'
-                ? 'linear-gradient(135deg, #00AED6 0%, #007AB8 100%)'
+                : paymentMethod === 'SeaBank'
+                ? 'linear-gradient(135deg, #F36F21 0%, #D45A18 100%)'
                 : 'linear-gradient(135deg, #3DAA6A 0%, #1E7D46 100%)',
               padding: '1.5rem 1.5rem 3.5rem',
               position: 'relative',
@@ -2125,9 +2125,9 @@ const POS = () => {
                   fontWeight: 900,
                   fontSize: '0.8rem',
                   letterSpacing: '0.5px',
-                  color: paymentMethod === 'DANA' ? '#118EEA' : paymentMethod === 'GoPay' ? '#00AED6' : '#3DAA6A',
+                  color: paymentMethod === 'DANA' ? '#118EEA' : paymentMethod === 'SeaBank' ? '#F36F21' : '#3DAA6A',
                 }}>
-                  {paymentMethod === 'DANA' ? 'DANA' : paymentMethod === 'GoPay' ? 'GoPay' : 'QRIS'}
+                  {paymentMethod === 'DANA' ? 'DANA' : paymentMethod === 'SeaBank' ? 'SeaBank' : 'QRIS'}
                 </div>
                 <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>×</span>
                 <div style={{
@@ -2208,22 +2208,22 @@ const POS = () => {
                 marginBottom: '1rem',
                 flexWrap: 'wrap',
               }}>
-                {['DANA', 'GoPay', 'ShopeePay', 'm-Banking'].map(app => (
+                {['DANA', 'SeaBank', 'ShopeePay', 'm-Banking'].map(app => (
                   <span key={app} style={{
                     padding: '4px 10px',
                     borderRadius: '20px',
                     fontSize: '0.7rem',
                     fontWeight: 700,
                     background: app === 'DANA' ? 'rgba(17,142,234,0.12)' 
-                              : app === 'GoPay' ? 'rgba(0,174,214,0.12)' 
+                              : app === 'SeaBank' ? 'rgba(243,111,33,0.12)' 
                               : app === 'ShopeePay' ? 'rgba(238,78,36,0.1)'
                               : 'var(--color-surface-alt)',
                     color: app === 'DANA' ? '#118EEA' 
-                         : app === 'GoPay' ? '#00AED6' 
+                         : app === 'SeaBank' ? '#F36F21' 
                          : app === 'ShopeePay' ? '#EE4E24'
                          : 'var(--color-text-secondary)',
                     border: `1px solid ${app === 'DANA' ? 'rgba(17,142,234,0.25)' 
-                           : app === 'GoPay' ? 'rgba(0,174,214,0.25)' 
+                           : app === 'SeaBank' ? 'rgba(243,111,33,0.25)' 
                            : app === 'ShopeePay' ? 'rgba(238,78,36,0.2)'
                            : 'var(--color-border)'}`,
                   }}>
@@ -2260,8 +2260,8 @@ const POS = () => {
                   borderRadius: '14px',
                   background: isSubmitting ? undefined : paymentMethod === 'DANA'
                     ? 'linear-gradient(135deg, #118EEA, #0671C6)'
-                    : paymentMethod === 'GoPay'
-                    ? 'linear-gradient(135deg, #00AED6, #007AB8)'
+                    : paymentMethod === 'SeaBank'
+                    ? 'linear-gradient(135deg, #F36F21, #D45A18)'
                     : undefined,
                   border: 'none',
                   boxShadow: '0 4px 16px rgba(0,0,0,0.2)',

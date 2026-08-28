@@ -418,7 +418,8 @@ const Finance = () => {
                   <option value="Transfer Bank">Transfer Bank / M-Banking</option>
                   <option value="QRIS">QRIS</option>
                   <option value="DANA">DANA</option>
-                  <option value="GoPay">GoPay</option>
+                  <option value="SeaBank">SeaBank</option>
+                  <option value="Transfer">Transfer</option>
                   <option value="Kartu Debit/Kredit">Kartu Debit / Kredit</option>
                   <option value="Lainnya">Lainnya</option>
                 </select>

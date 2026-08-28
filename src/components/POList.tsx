@@ -443,7 +443,7 @@ const POList = () => {
                   <div style={{ padding: '1rem', background: 'var(--color-surface-alt)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
                     <label className="form-label" style={{ marginBottom: '0.75rem', display: 'block' }}>Metode Pembayaran (Untuk Rp {(editData.poDpAmount - (editModal.tx.poDpAmount !== undefined ? editModal.tx.poDpAmount : editModal.tx.amount)).toLocaleString('id-ID')})</label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '0.5rem' }}>
-                      {['Tunai', 'QRIS', 'Transfer'].map(method => (
+                      {['Tunai', 'QRIS', 'DANA', 'SeaBank', 'Transfer'].map(method => (
                         <button
                           key={method}
                           onClick={() => setEditData({ ...editData, paymentMethod: method })}
@@ -505,7 +505,7 @@ const POList = () => {
               <div style={{ marginBottom: '1.5rem' }}>
                 <label className="form-label">Metode Pembayaran</label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '0.5rem' }}>
-                  {['Tunai', 'QRIS', 'Transfer'].map(method => (
+                  {['Tunai', 'QRIS', 'DANA', 'SeaBank', 'Transfer'].map(method => (
                     <button
                       key={method}
                       onClick={() => setSettleModal({ ...settleModal, paymentMethod: method })}
