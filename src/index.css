@@ -1951,40 +1951,55 @@ input[type=number] {
 }
 
 /* ==========================================================================
-   23. Cetak Struk (Receipt)
+   23. Cetak Struk (Receipt) - Mobile & Thermal Printer Compatible
    ========================================================================== */
 .print-receipt {
   display: none;
 }
 
 @media print {
-  /* Sembunyikan seluruh UI aplikasi utama */
-  #root {
+  @page {
+    margin: 0mm;
+    size: portrait;
+  }
+
+  /* Reset html & body so overflow clipping does not cut off or hide receipt in iOS / Android / Chrome */
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Sembunyikan semua elemen di luar komponen struk */
+  body > *:not(.print-receipt) {
     display: none !important;
   }
 
   /* Tampilkan komponen struk yang di-portal ke body */
   .print-receipt {
     display: block !important;
-    width: 58mm; /* Ukuran thermal printer standar */
-    margin: 0;
-    padding: 0;
-    font-family: 'Courier New', Courier, monospace;
-    color: #000;
-    background: #fff;
-    font-size: 12px;
-    line-height: 1.2;
-  }
-
-  /* Hilangkan margin browser dan set ukuran kertas jadi roll (auto-height) */
-  @page {
-    margin: 0;
-    size: 58mm auto;
-  }
-  body {
-    margin: 0;
-    padding: 0;
+    visibility: visible !important;
+    position: relative !important;
+    width: 58mm !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 4mm 3mm !important;
+    box-sizing: border-box !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    color: #000 !important;
     background: #fff !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
   }
 
   .receipt-header {
@@ -2017,6 +2032,8 @@ input[type=number] {
   }
   .receipt-item {
     margin-bottom: 6px;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .receipt-item-name {
     font-weight: bold;
@@ -2037,7 +2054,7 @@ input[type=number] {
     display: flex;
     justify-content: space-between;
     font-weight: bold;
-    font-size: 14px;
+    font-size: 13px;
     margin-bottom: 4px;
   }
   .receipt-footer {

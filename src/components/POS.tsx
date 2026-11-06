@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, type FormEvent, type CSSProperties } from 'react';
+import { useState, useEffect, useContext, useRef, type FormEvent, type CSSProperties } from 'react';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../utils/format';
 import { ShoppingCart, Check, Trash2, Plus, Minus, Settings, Image as ImageIcon, Pencil, Tag, Search, X, ChevronUp, ChevronDown, Printer, CheckCircle, Lock, MessageCircle, Phone } from 'lucide-react';
@@ -65,6 +65,7 @@ const POS = () => {
   const [actionReason, setActionReason] = useState({ name: '', reason: '' });
   const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const [showQRISModal, setShowQRISModal] = useState(false);
   const [dynamicQRIS, setDynamicQRIS] = useState('');
   const [qrisString, setQrisString] = useState('');
@@ -74,7 +75,19 @@ const POS = () => {
   const [memberPurchaseCount, setMemberPurchaseCount] = useState<number | null>(null);
   const [checkingMember, setCheckingMember] = useState(false);
   const [editingCartItem, setEditingCartItem] = useState<{ cartKey: string, price: string } | null>(null);
+  const priceInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
+
+  // Auto-focus price input when edit modal opens (with delay for iOS/Android compatibility)
+  useEffect(() => {
+    if (editingCartItem && priceInputRef.current) {
+      const timer = setTimeout(() => {
+        priceInputRef.current?.focus();
+        priceInputRef.current?.select();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [editingCartItem]);
   const { isAdmin } = useContext(AuthContext);
 
   useEffect(() => {
@@ -1123,40 +1136,12 @@ const POS = () => {
                           </div>
                         )}
                         <div className="text-muted text-xs flex items-center gap-2" style={{ marginTop: '0.2rem' }}>
-                          {editingCartItem?.cartKey === item.cartKey ? (
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              className="form-input"
-                              style={{ width: '80px', padding: '0.2rem 0.4rem', fontSize: '0.75rem', height: 'auto' }}
-                              value={editingCartItem.price}
-                              onChange={(e) => setEditingCartItem({ ...editingCartItem, price: e.target.value.replace(/\D/g, '') })}
-                              onBlur={() => {
-                                const newPrice = Number(editingCartItem.price);
-                                if (!isNaN(newPrice)) {
-                                  setCart(prev => prev.map(i => i.cartKey === item.cartKey ? { ...i, customUnitPrice: newPrice } : i));
-                                }
-                                setEditingCartItem(null);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  const newPrice = Number(editingCartItem.price);
-                                  if (!isNaN(newPrice)) {
-                                    setCart(prev => prev.map(i => i.cartKey === item.cartKey ? { ...i, customUnitPrice: newPrice } : i));
-                                  }
-                                  setEditingCartItem(null);
-                                }
-                              }}
-                              autoFocus
-                            />
-                          ) : (
-                            <span 
-                              onClick={() => setEditingCartItem({ cartKey: item.cartKey, price: (item.customUnitPrice !== undefined ? item.customUnitPrice : getBaseUnitPrice(item)).toString() })}
-                              style={{ cursor: 'pointer', borderBottom: '1px dashed var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              {formatCurrency(item.customUnitPrice !== undefined ? item.customUnitPrice : getBaseUnitPrice(item))} <Pencil size={10} />
-                            </span>
-                          )}
+                          <span 
+                            onClick={() => setEditingCartItem({ cartKey: item.cartKey, price: (item.customUnitPrice !== undefined ? item.customUnitPrice : getBaseUnitPrice(item)).toString() })}
+                            style={{ cursor: 'pointer', borderBottom: '1px dashed var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation', userSelect: 'none', minHeight: '32px', padding: '2px 4px' }}
+                          >
+                            {formatCurrency(item.customUnitPrice !== undefined ? item.customUnitPrice : getBaseUnitPrice(item))} <Pencil size={10} />
+                          </span>
                           × {item.quantity} = <span className="font-semibold text-primary">{formatCurrency(itemTotalPrice(item))}</span>
                           {item.customUnitPrice !== undefined && (
                             <button onClick={() => setCart(prev => prev.map(i => i.cartKey === item.cartKey ? { ...i, customUnitPrice: undefined } : i))} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-expense)', marginLeft: '4px' }}><X size={12} /></button>
@@ -2027,17 +2012,28 @@ const POS = () => {
                   )}
                 </>
               )}
-              <button 
-                className="btn btn-primary" 
-                onClick={() => {
-                  setTimeout(() => {
-                    window.print();
-                  }, 100);
-                }}
-                style={{ padding: '0.85rem', width: '100%' }}
-              >
-                <Printer size={18} /> Cetak Struk
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setShowReceiptPreview(true)}
+                  style={{ flex: 1, padding: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontWeight: 600 }}
+                >
+                  <Search size={16} /> Lihat Struk
+                </button>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => {
+                    try {
+                      window.print();
+                    } catch (err) {
+                      console.error('Print failed:', err);
+                    }
+                  }}
+                  style={{ flex: 1.3, padding: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontWeight: 700 }}
+                >
+                  <Printer size={18} /> Cetak Struk
+                </button>
+              </div>
               <button 
                 className="btn btn-outline" 
                 onClick={() => {
@@ -2345,8 +2341,97 @@ const POS = () => {
         </div>
       )}
 
+      {/* ── Modal Edit Harga (Mobile-Friendly) ── */}
+      {editingCartItem && (
+        <div 
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', zIndex: 10000,
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+          onClick={() => setEditingCartItem(null)}
+        >
+          <div 
+            style={{
+              background: 'var(--color-surface)', 
+              borderRadius: '20px 20px 0 0',
+              padding: '1.5rem', 
+              width: '100%', 
+              maxWidth: '480px',
+              boxShadow: '0 -8px 32px rgba(0,0,0,0.2)',
+              animation: 'modal-slide-up 0.25s ease-out',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'var(--color-border)', margin: '0 auto 1rem' }} />
+            <h4 style={{ fontWeight: 700, marginBottom: '0.5rem', fontSize: '1rem' }}>✏️ Edit Harga Satuan</h4>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+              {cart.find(i => i.cartKey === editingCartItem.cartKey)?.product.name || 'Item'}
+            </p>
+            <div style={{ position: 'relative', marginBottom: '1rem' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)', fontWeight: 600, fontSize: '0.95rem' }}>Rp</span>
+              <input
+                ref={priceInputRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className="form-input"
+                style={{ 
+                  width: '100%', 
+                  padding: '0.85rem 0.85rem 0.85rem 2.5rem', 
+                  fontSize: '1.2rem', 
+                  fontWeight: 700,
+                  borderRadius: '12px',
+                  textAlign: 'left',
+                }}
+                value={editingCartItem.price ? formatCurrencyInput(editingCartItem.price) : ''}
+                onChange={(e) => setEditingCartItem({ ...editingCartItem, price: e.target.value.replace(/\D/g, '') })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const newPrice = Number(editingCartItem.price);
+                    if (!isNaN(newPrice) && newPrice > 0) {
+                      setCart(prev => prev.map(i => i.cartKey === editingCartItem.cartKey ? { ...i, customUnitPrice: newPrice } : i));
+                    }
+                    setEditingCartItem(null);
+                  }
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button 
+                className="btn btn-outline" 
+                style={{ flex: 1, padding: '0.8rem', fontWeight: 600, borderRadius: '12px', fontSize: '0.95rem' }}
+                onClick={() => setEditingCartItem(null)}
+              >
+                Batal
+              </button>
+              <button 
+                className="btn btn-primary" 
+                style={{ flex: 1, padding: '0.8rem', fontWeight: 700, borderRadius: '12px', fontSize: '0.95rem' }}
+                onClick={() => {
+                  const newPrice = Number(editingCartItem.price);
+                  if (!isNaN(newPrice) && newPrice > 0) {
+                    setCart(prev => prev.map(i => i.cartKey === editingCartItem.cartKey ? { ...i, customUnitPrice: newPrice } : i));
+                  }
+                  setEditingCartItem(null);
+                }}
+              >
+                <Check size={18} style={{ display: 'inline', marginRight: '0.4rem', verticalAlign: 'middle' }} />
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Komponen Struk (Hanya terlihat saat diprint) */}
-      {lastTransaction && <Receipt transaction={lastTransaction} />}
+      {lastTransaction && (
+        <Receipt 
+          transaction={lastTransaction} 
+          showPreviewModal={showReceiptPreview} 
+          onClosePreview={() => setShowReceiptPreview(false)} 
+        />
+      )}
 
     </div>
   );
