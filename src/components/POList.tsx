@@ -67,7 +67,7 @@ const POList = () => {
     if (phone.startsWith('0')) phone = '62' + phone.slice(1);
     else if (phone.startsWith('8')) phone = '62' + phone;
     
-    const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+    const formatCurrencyLocal = (num: number) => 'Rp ' + Math.round(num || 0).toLocaleString('id-ID');
     const itemDetails = tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:.*? - /i, '').trim();
     
     const customerNameVal = tx.customerName || 'Member';
@@ -96,10 +96,9 @@ const POList = () => {
             throw new Error(data.message || 'Gagal dari pihak Watzap');
           }
           showToast('success', 'Struk WA Terkirim!', `Notifikasi PO selesai dikirim ke pelanggan otomatis via Watzap.`);
-        }).catch(() => {
-          showToast('error', 'WA Gateway Gagal', 'Browser memblokir tab baru (Pop-up Blocker). Silakan izinkan pop-up atau kirim manual via tombol WA di tabel.');
-          const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-          window.open(url, '_blank');
+        }).catch((err) => {
+          console.warn('Watzap auto-send error:', err);
+          showToast('error', 'WA Gateway Gagal', 'Gagal kirim otomatis. Silakan gunakan tombol WhatsApp pada tabel.');
         });
       } else {
         let endpoint = waGatewayConfig.url || '/api/fonnte/send';
@@ -115,21 +114,15 @@ const POList = () => {
           body: fonnteData
         }).then(res => res.json()).then(data => {
           if (!data.status) {
-            showToast('error', 'WA Gateway Gagal', 'Token Fonnte tidak valid / perangkat mati. Pop-up blocker memblokir tab manual. Silakan gunakan tombol WA di tabel.');
-            const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-            window.open(url, '_blank');
+            showToast('error', 'WA Gateway Gagal', 'Token Fonnte tidak valid atau perangkat offline. Silakan kirim manual via tabel.');
           } else {
             showToast('success', 'Struk WA Terkirim!', `Notifikasi PO selesai dikirim ke pelanggan otomatis.`);
           }
-        }).catch(() => {
-          showToast('error', 'WA Gateway Gagal', 'Browser memblokir tab baru (Pop-up Blocker). Silakan izinkan pop-up atau kirim manual via tombol WA di tabel.');
-          const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-          window.open(url, '_blank');
+        }).catch((err) => {
+          console.warn('Fonnte auto-send error:', err);
+          showToast('error', 'WA Gateway Gagal', 'Gagal kirim otomatis. Silakan gunakan tombol WhatsApp pada tabel.');
         });
       }
-    } else {
-      const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-      window.open(url, '_blank');
     }
   };
 

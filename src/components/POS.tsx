@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useState, useEffect, useContext, useRef, type FormEvent, type CSSProperties } from 'react';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../utils/format';
@@ -133,39 +134,55 @@ const POS = () => {
   }, [customerPhone]);
 
   const sendWhatsAppToMember = (tx: any, forceManual: boolean = false) => {
-    let phone = tx.customerPhone || '';
+    let phone = (tx.customerPhone || '').replace(/\D/g, '');
     if (!phone) return;
-    phone = phone.replace(/\D/g, '');
     if (phone.startsWith('0')) {
       phone = '62' + phone.slice(1);
     } else if (phone.startsWith('8')) {
       phone = '62' + phone;
     }
+    if (phone.length < 9) return;
     
-    const formatCurrencyLocal = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+    // Clean currency format using normal ASCII space (prevents corrupted characters in WA)
+    const formatCleanRupiah = (num: number) => 'Rp ' + Math.round(num || 0).toLocaleString('id-ID');
     
     let originalCalculatedTotal = 0;
     const itemsText = (tx.items || []).map((item: any) => {
-      const baseUnit = item.product.price + (item.addOns || []).reduce((s: number, a: any) => s + a.price, 0) + (item.extras || []).reduce((s: number, e: any) => s + (e.pricePerUnit * e.quantity), 0);
+      const productName = item.product?.name || item.name || 'Produk';
+      const baseProductPrice = item.product?.price || 0;
+      const addOnTotal = (item.addOns || []).reduce((s: number, a: any) => s + (a.price || 0), 0);
+      const extrasTotal = (item.extras || []).reduce((s: number, e: any) => s + ((e.pricePerUnit || 0) * (e.quantity || 1)), 0);
+      const baseUnit = baseProductPrice + addOnTotal + extrasTotal;
       const unitPrice = item.customUnitPrice !== undefined ? item.customUnitPrice : baseUnit;
-      originalCalculatedTotal += (unitPrice * item.quantity);
-      return `▪️ ${item.quantity}x ${item.product.name} (${formatCurrencyLocal(item.quantity * unitPrice)})`;
+      const qty = item.quantity || 1;
+      originalCalculatedTotal += (unitPrice * qty);
+      
+      let line = `▪️ ${qty}x ${productName} (${formatCleanRupiah(qty * unitPrice)})`;
+      if (item.note) line += `\n   Catatan: ${item.note}`;
+      return line;
     }).join('\n');
     
-    const isPO = tx.poStatus === 'pending';
+    const isPO = tx.poStatus === 'pending' || tx.poStatus === 'po';
     const countVal = tx.purchaseCount || 1;
     const countText = isPO ? '' : `*Pembelian ke:* ${countVal} 🎉\n`;
     const rincianText = `*ID Order:* ${tx.transactionId || 'Baru'}\n${countText}${itemsText}`;
     
-    const totalVal = tx.poTotalAmount || tx.total;
+    const totalVal = tx.poTotalAmount !== undefined ? tx.poTotalAmount : tx.total;
     const dpVal = tx.poDpAmount !== undefined ? tx.poDpAmount : tx.total;
-    const sisaVal = totalVal - dpVal;
-    let totalText = `${formatCurrencyLocal(totalVal)} (${tx.paymentMethod})`;
-    if (isPO && sisaVal > 0) {
-       totalText += `\n*Sudah Dibayar (DP):* ${formatCurrencyLocal(dpVal)}\n*Sisa Pelunasan:* ${formatCurrencyLocal(sisaVal)}`;
+    const sisaVal = Math.max(0, totalVal - dpVal);
+    let totalText = formatCleanRupiah(totalVal);
+    if (isPO) {
+       totalText += `\n*Sudah Dibayar (DP):* ${formatCleanRupiah(dpVal)} (${tx.paymentMethod || 'Tunai'})`;
+       if (sisaVal > 0) {
+         totalText += `\n*Sisa Pelunasan:* ${formatCleanRupiah(sisaVal)}`;
+       } else {
+         totalText += `\n*Status:* LUNAS`;
+       }
+    } else {
+       totalText += ` (${tx.paymentMethod || 'Tunai'})`;
     }
     
-    const customerNameVal = tx.customerName || 'Member';
+    const customerNameVal = tx.customerName || 'Pelanggan';
     const shopNameVal = waGatewayConfig.shopName || 'Vrimae';
 
     let message = '';
@@ -179,7 +196,7 @@ const POS = () => {
     } else {
       if (isPO) {
         const pickupStr = tx.poPickupDate ? safeFormatDate(tx.poPickupDate, 'dd MMM yyyy, HH:mm') : '-';
-        message = `Halo Kak *${customerNameVal}*,\nTerima kasih telah melakukan *Pre-Order* di *${shopNameVal}*! 💖✨\n\nBerikut rincian Pre-Order Anda:\n${rincianText}\n\n*Total Tagihan:* ${totalText}\n*Tanggal Pengambilan:* ${pickupStr}\n\nKami akan segera memproses pesanan Anda. Ditunggu kedatangannya! 😊🙏`;
+        message = `Halo Kak *${customerNameVal}*,\nTerima kasih telah melakukan *Pre-Order* di *${shopNameVal}*! 💖✨\n\nBerikut rincian Pre-Order Anda:\n${rincianText}\n\n*Rincian Pembayaran:*\n${totalText}\n*Tanggal Pengambilan:* ${pickupStr}\n\nKami akan segera memproses pesanan Anda. Ditunggu kedatangannya! 😊🙏`;
       } else {
         const loyaltyGreeting = countVal > 1
           ? `Terima kasih banyak telah menjadi *Member Setia* kami! 💖✨ Ini adalah *pembelian ke-${countVal}* Anda di *${shopNameVal}*! 🥳🔥`
@@ -207,9 +224,7 @@ const POS = () => {
           showToast('success', 'Struk WA Terkirim!', `Pesan otomatis terkirim ke HP Member (${phone}) via Watzap.`);
         }).catch(err => {
           console.error('WA Gateway error:', err);
-          showToast('error', 'WA Gateway Gagal', 'Browser memblokir tab baru (Pop-up Blocker). Silakan gunakan tombol Kirim Manual.');
-          const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-          window.open(url, '_blank');
+          showToast('error', 'Gagal Kirim Otomatis', 'Koneksi WA Gateway terputus. Silakan gunakan tombol WhatsApp manual.');
         });
       } else {
         let endpoint = waGatewayConfig.url || '/api/fonnte/send';
@@ -233,15 +248,16 @@ const POS = () => {
           showToast('success', 'Struk WA Terkirim!', `Pesan otomatis terkirim ke HP Member (${phone}) di balik layar tanpa membuka tab.`);
         }).catch(err => {
           console.error('WA Gateway error:', err);
-          showToast('error', 'WA Gateway Gagal', 'Browser memblokir tab baru (Pop-up Blocker). Silakan gunakan tombol Kirim Manual.');
-          const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-          window.open(url, '_blank');
+          showToast('error', 'Gagal Kirim Otomatis', 'Koneksi WA Gateway terputus. Silakan gunakan tombol WhatsApp manual.');
         });
       }
     } else {
+      // Manual trigger directly from user click (safe from pop-up blocker)
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
       window.open(url, '_blank');
-      showToast('info', 'Membuka WhatsApp Web', 'Tips: Hubungkan Token Fonnte di menu Setelan agar WA terkirim 100% otomatis TANPA BUKA TAB!');
+      if (!waGatewayConfig.token) {
+        showToast('info', 'Membuka WhatsApp Web', 'Tips: Hubungkan Token Fonnte di menu Setelan agar WA terkirim otomatis di balik layar!');
+      }
     }
   };
 
@@ -602,10 +618,10 @@ const POS = () => {
         }).catch(err => console.error('Async inventory check error:', err));
       }, 50);
 
-      if (finishedTx.customerPhone) {
+      if (finishedTx.customerPhone && waGatewayConfig.token) {
         setTimeout(() => {
           sendWhatsAppToMember(finishedTx);
-        }, 300);
+        }, 400);
       }
 
       // Telegram Notification
@@ -2341,35 +2357,52 @@ const POS = () => {
         </div>
       )}
 
-      {/* ── Modal Edit Harga (Mobile-Friendly) ── */}
-      {editingCartItem && (
+      {/* ── Modal Edit Harga (Universal Portal: HP, iPad & Desktop) ── */}
+      {editingCartItem && createPortal(
         <div 
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.5)', zIndex: 10000,
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', zIndex: 99999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
+            backdropFilter: 'blur(3px)',
+            WebkitBackdropFilter: 'blur(3px)',
           }}
           onClick={() => setEditingCartItem(null)}
         >
           <div 
             style={{
               background: 'var(--color-surface)', 
-              borderRadius: '20px 20px 0 0',
+              borderRadius: '20px',
               padding: '1.5rem', 
               width: '100%', 
-              maxWidth: '480px',
-              boxShadow: '0 -8px 32px rgba(0,0,0,0.2)',
-              animation: 'modal-slide-up 0.25s ease-out',
+              maxWidth: '380px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+              border: '1px solid var(--color-border)',
+              animation: 'modal-enter 0.2s ease-out',
+              display: 'flex',
+              flexDirection: 'column',
+              boxSizing: 'border-box',
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'var(--color-border)', margin: '0 auto 1rem' }} />
-            <h4 style={{ fontWeight: 700, marginBottom: '0.5rem', fontSize: '1rem' }}>✏️ Edit Harga Satuan</h4>
-            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-              {cart.find(i => i.cartKey === editingCartItem.cartKey)?.product.name || 'Item'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h4 style={{ fontWeight: 800, margin: 0, fontSize: '1.05rem', color: 'var(--color-text)' }}>✏️ Edit Harga Satuan</h4>
+              <button 
+                type="button"
+                onClick={() => setEditingCartItem(null)}
+                style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1rem', fontWeight: 500 }}>
+              {cart.find(i => i.cartKey === editingCartItem.cartKey)?.product.name || 'Produk'}
             </p>
-            <div style={{ position: 'relative', marginBottom: '1rem' }}>
-              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)', fontWeight: 600, fontSize: '0.95rem' }}>Rp</span>
+
+            <div style={{ position: 'relative', marginBottom: '1.25rem' }}>
+              <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)', fontWeight: 700, fontSize: '1rem' }}>Rp</span>
               <input
                 ref={priceInputRef}
                 type="text"
@@ -2378,18 +2411,20 @@ const POS = () => {
                 className="form-input"
                 style={{ 
                   width: '100%', 
-                  padding: '0.85rem 0.85rem 0.85rem 2.5rem', 
-                  fontSize: '1.2rem', 
-                  fontWeight: 700,
+                  padding: '0.85rem 0.85rem 0.85rem 2.8rem', 
+                  fontSize: '1.3rem', 
+                  fontWeight: 800,
                   borderRadius: '12px',
                   textAlign: 'left',
+                  border: '2px solid var(--color-primary)',
+                  boxSizing: 'border-box',
                 }}
                 value={editingCartItem.price ? formatCurrencyInput(editingCartItem.price) : ''}
                 onChange={(e) => setEditingCartItem({ ...editingCartItem, price: e.target.value.replace(/\D/g, '') })}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     const newPrice = Number(editingCartItem.price);
-                    if (!isNaN(newPrice) && newPrice > 0) {
+                    if (!isNaN(newPrice) && newPrice >= 0) {
                       setCart(prev => prev.map(i => i.cartKey === editingCartItem.cartKey ? { ...i, customUnitPrice: newPrice } : i));
                     }
                     setEditingCartItem(null);
@@ -2397,31 +2432,35 @@ const POS = () => {
                 }}
               />
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+
+            <div style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
               <button 
+                type="button"
                 className="btn btn-outline" 
-                style={{ flex: 1, padding: '0.8rem', fontWeight: 600, borderRadius: '12px', fontSize: '0.95rem' }}
+                style={{ flex: 1, padding: '0.85rem', fontWeight: 600, borderRadius: '12px', fontSize: '0.95rem' }}
                 onClick={() => setEditingCartItem(null)}
               >
                 Batal
               </button>
               <button 
+                type="button"
                 className="btn btn-primary" 
-                style={{ flex: 1, padding: '0.8rem', fontWeight: 700, borderRadius: '12px', fontSize: '0.95rem' }}
+                style={{ flex: 1, padding: '0.85rem', fontWeight: 700, borderRadius: '12px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
                 onClick={() => {
                   const newPrice = Number(editingCartItem.price);
-                  if (!isNaN(newPrice) && newPrice > 0) {
+                  if (!isNaN(newPrice) && newPrice >= 0) {
                     setCart(prev => prev.map(i => i.cartKey === editingCartItem.cartKey ? { ...i, customUnitPrice: newPrice } : i));
                   }
                   setEditingCartItem(null);
                 }}
               >
-                <Check size={18} style={{ display: 'inline', marginRight: '0.4rem', verticalAlign: 'middle' }} />
-                Simpan
+                <Check size={18} />
+                <span>Simpan</span>
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Komponen Struk (Hanya terlihat saat diprint) */}
