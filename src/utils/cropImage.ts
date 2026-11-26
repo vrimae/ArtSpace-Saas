@@ -13,6 +13,16 @@ export function getRadianAngle(degreeValue: number) {
   return (degreeValue * Math.PI) / 180;
 }
 
+// Melepaskan memori GPU Canvas segera setelah selesai (penting untuk batas memori 16MP di iOS/iPadOS Safari)
+const releaseCanvas = (canvas: HTMLCanvasElement) => {
+  try {
+    canvas.width = 0;
+    canvas.height = 0;
+  } catch {
+    // ignore
+  }
+};
+
 export default async function getCroppedImg(
   imageSrc: string,
   pixelCrop: { x: number; y: number; width: number; height: number },
@@ -20,63 +30,85 @@ export default async function getCroppedImg(
 ): Promise<string> {
   try {
     const image = await createImage(imageSrc);
+    const MAX_SIZE = 500;
+    let finalWidth = Math.max(1, Math.round(pixelCrop.width));
+    let finalHeight = Math.max(1, Math.round(pixelCrop.height));
+
+    if (finalWidth > MAX_SIZE || finalHeight > MAX_SIZE) {
+      if (finalWidth > finalHeight) {
+        finalHeight = Math.max(1, Math.round((finalHeight * MAX_SIZE) / finalWidth));
+        finalWidth = MAX_SIZE;
+      } else {
+        finalWidth = Math.max(1, Math.round((finalWidth * MAX_SIZE) / finalHeight));
+        finalHeight = MAX_SIZE;
+      }
+    }
+
+    const croppedCanvas = document.createElement('canvas');
+    const croppedCtx = croppedCanvas.getContext('2d');
+    if (!croppedCtx) return imageSrc;
+
+    croppedCanvas.width = finalWidth;
+    croppedCanvas.height = finalHeight;
+
+    // Isi latar putih agar gambar PNG transparan tidak berubah menjadi hitam saat dikompres ke JPEG
+    croppedCtx.fillStyle = '#FFFFFF';
+    croppedCtx.fillRect(0, 0, finalWidth, finalHeight);
+
+    // Jalur cepat hemat RAM (tanpa alokasi canvas perantara penuh untuk foto kamera 12MP/48MP iPhone & Android)
+    if (!rotation || rotation % 360 === 0) {
+      croppedCtx.drawImage(
+        image,
+        pixelCrop.x,
+        pixelCrop.y,
+        pixelCrop.width,
+        pixelCrop.height,
+        0,
+        0,
+        finalWidth,
+        finalHeight
+      );
+      const out = croppedCanvas.toDataURL('image/jpeg', 0.75);
+      releaseCanvas(croppedCanvas);
+      return out;
+    }
+
+    // Jika ada rotasi, batasi ukuran canvas perantara di bawah batas piksel maksimum WebKit iOS (4096x4096)
+    const MAX_SAFARI_DIM = 3840;
+    const scale = Math.min(1, MAX_SAFARI_DIM / Math.max(image.width, image.height));
+    const safeWidth = Math.max(1, Math.round(image.width * scale));
+    const safeHeight = Math.max(1, Math.round(image.height * scale));
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-
     if (!ctx) {
+      releaseCanvas(croppedCanvas);
       return imageSrc;
     }
 
-  // set canvas size to match the bounding box
-  canvas.width = image.width;
-  canvas.height = image.height;
+    canvas.width = safeWidth;
+    canvas.height = safeHeight;
+    ctx.translate(safeWidth / 2, safeHeight / 2);
+    ctx.rotate(getRadianAngle(rotation));
+    ctx.translate(-safeWidth / 2, -safeHeight / 2);
+    ctx.drawImage(image, 0, 0, safeWidth, safeHeight);
 
-  ctx.translate(image.width / 2, image.height / 2);
-  ctx.rotate(getRadianAngle(rotation));
-  ctx.translate(-image.width / 2, -image.height / 2);
-  ctx.drawImage(image, 0, 0);
+    croppedCtx.drawImage(
+      canvas,
+      pixelCrop.x * scale,
+      pixelCrop.y * scale,
+      pixelCrop.width * scale,
+      pixelCrop.height * scale,
+      0,
+      0,
+      finalWidth,
+      finalHeight
+    );
 
-  const croppedCanvas = document.createElement('canvas');
-  const croppedCtx = croppedCanvas.getContext('2d');
-
-  if (!croppedCtx) {
-    return imageSrc;
-  }
-
-  // Define max dimensions (500x500)
-  const MAX_SIZE = 500;
-  let finalWidth = pixelCrop.width;
-  let finalHeight = pixelCrop.height;
-
-  if (finalWidth > MAX_SIZE || finalHeight > MAX_SIZE) {
-    if (finalWidth > finalHeight) {
-      finalHeight = Math.round((finalHeight * MAX_SIZE) / finalWidth);
-      finalWidth = MAX_SIZE;
-    } else {
-      finalWidth = Math.round((finalWidth * MAX_SIZE) / finalHeight);
-      finalHeight = MAX_SIZE;
-    }
-  }
-
-  // Set the size of the cropped canvas
-  croppedCanvas.width = finalWidth;
-  croppedCanvas.height = finalHeight;
-
-  // Draw the cropped image onto the new canvas
-  croppedCtx.drawImage(
-    canvas,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
-    0,
-    0,
-    finalWidth,
-    finalHeight
-  );
-
-  // As Base64 string
-  return croppedCanvas.toDataURL('image/jpeg', 0.75);
+    const result = croppedCanvas.toDataURL('image/jpeg', 0.75);
+    releaseCanvas(canvas);
+    releaseCanvas(croppedCanvas);
+    return result;
   } catch (err) {
     console.warn('Cropping error occurred, returning compressed original image source:', err);
     return await compressImage(imageSrc);
@@ -93,19 +125,23 @@ export async function compressImage(imageSrc: string, maxSize = 450, quality = 0
     let { width, height } = image;
     if (width > maxSize || height > maxSize) {
       if (width > height) {
-        height = Math.round((height * maxSize) / width);
+        height = Math.max(1, Math.round((height * maxSize) / width));
         width = maxSize;
       } else {
-        width = Math.round((width * maxSize) / height);
+        width = Math.max(1, Math.round((width * maxSize) / height));
         height = maxSize;
       }
     }
 
     canvas.width = width;
     canvas.height = height;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, width, height);
     ctx.drawImage(image, 0, 0, width, height);
 
-    return canvas.toDataURL('image/jpeg', quality);
+    const out = canvas.toDataURL('image/jpeg', quality);
+    releaseCanvas(canvas);
+    return out;
   } catch (err) {
     console.warn('Compression failed, returning raw image:', err);
     return imageSrc;

@@ -1,6 +1,8 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { clearSystemCacheSafely } from '../utils/systemCache';
+import { invalidateAllDataCaches } from '../utils/storage';
 
 interface Props {
   children?: ReactNode;
@@ -9,52 +11,96 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  clearing: boolean;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null
+    error: null,
+    clearing: false,
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, clearing: false };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
   }
 
+  private handleCleanReload = async () => {
+    this.setState({ clearing: true });
+    try {
+      await clearSystemCacheSafely(invalidateAllDataCaches);
+    } catch {
+      // ignore
+    }
+    window.location.reload();
+  };
+
   public render() {
     if (this.state.hasError) {
       return (
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          height: '100vh', width: '100vw', padding: '20px', textAlign: 'center',
-          backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)'
-        }}>
-          <AlertTriangle size={64} style={{ color: '#ef4444', marginBottom: '20px' }} />
-          <h1 style={{ fontSize: '1.5rem', marginBottom: '10px' }}>Oops! Sesuatu berjalan salah.</h1>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '30px', maxWidth: '400px' }}>
-            Aplikasi mengalami kesalahan sistem (Mungkin karena jaringan atau pembaruan). Silakan muat ulang halaman ini.
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100dvh',
+            width: '100%',
+            padding: '24px',
+            textAlign: 'center',
+            backgroundColor: 'var(--color-bg)',
+            color: 'var(--color-text)',
+            boxSizing: 'border-box',
+          }}
+        >
+          <AlertTriangle size={60} style={{ color: '#ef4444', marginBottom: '18px' }} />
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '10px', color: 'var(--color-text)' }}>
+            Halaman Perlu Disegarkan
+          </h1>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '26px', maxWidth: '420px', fontSize: '0.92rem', lineHeight: 1.6 }}>
+            Terjadi kendala pemuatan sementara (biasanya karena koneksi jaringan atau pembaruan versi sistem). Data transaksi & akun Anda tetap aman.
           </p>
-          <button 
-            onClick={() => window.location.reload()}
-            style={{
-              padding: '12px 24px', backgroundColor: '#3b82f6', color: '#fff',
-              border: 'none', borderRadius: '8px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem',
-              fontWeight: 600, boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-            }}
-          >
-            <RefreshCw size={20} />
-            Muat Ulang Halaman
-          </button>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              onClick={this.handleCleanReload}
+              disabled={this.state.clearing}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#2563eb',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+              }}
+            >
+              <RefreshCw size={18} />
+              {this.state.clearing ? 'Membersihkan Cache...' : 'Bersihkan Cache & Muat Ulang'}
+            </button>
+          </div>
           {import.meta.env.DEV && this.state.error && (
-            <pre style={{
-              marginTop: '40px', padding: '15px', background: '#1e293b', color: '#f87171',
-              borderRadius: '8px', maxWidth: '80%', overflowX: 'auto', textAlign: 'left', fontSize: '0.8rem'
-            }}>
+            <pre
+              style={{
+                marginTop: '32px',
+                padding: '15px',
+                background: '#1e293b',
+                color: '#f87171',
+                borderRadius: '8px',
+                maxWidth: '90%',
+                overflowX: 'auto',
+                textAlign: 'left',
+                fontSize: '0.8rem',
+              }}
+            >
               {this.state.error.toString()}
             </pre>
           )}

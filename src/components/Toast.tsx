@@ -21,16 +21,19 @@ export const useToast = () => {
   return ctx;
 };
 
-const ToastItem: React.FC<{ toast: Toast, onRemove: (id: number, skipAnim?: boolean) => void }> = ({ toast, onRemove }) => {
+const ToastItem: React.FC<{ toast: Toast; onRemove: (id: number, skipAnim?: boolean) => void }> = ({ toast, onRemove }) => {
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
 
   const getIcon = (type: Toast['type']) => {
     switch (type) {
-      case 'success': return <CheckCircle size={20} />;
-      case 'error': return <XCircle size={20} />;
-      case 'info': return <Info size={20} />;
+      case 'success':
+        return <CheckCircle size={20} />;
+      case 'error':
+        return <XCircle size={20} />;
+      case 'info':
+        return <Info size={20} />;
     }
   };
 
@@ -48,29 +51,27 @@ const ToastItem: React.FC<{ toast: Toast, onRemove: (id: number, skipAnim?: bool
   const handleDragEnd = () => {
     if (!isDragging) return;
     setIsDragging(false);
-    // If swiped sideways more than 50px, dismiss
     if (Math.abs(dragOffset) > 50) {
-      setDragOffset(dragOffset > 0 ? window.innerWidth + 100 : -(window.innerWidth + 100)); // Fly out completely off screen
-      // Remove from DOM quickly without triggering the CSS toast-out animation
-      setTimeout(() => onRemove(toast.id, true), 500);
+      setDragOffset(dragOffset > 0 ? window.innerWidth + 100 : -(window.innerWidth + 100));
+      setTimeout(() => onRemove(toast.id, true), 450);
     } else {
-      setDragOffset(0); // Snap back
+      setDragOffset(0);
     }
   };
 
   return (
-    <div 
+    <div
       className={`toast ${toast.type} ${toast.exiting ? 'toast-exit' : ''}`}
-      style={{ 
+      style={{
         transform: dragOffset !== 0 ? `translateX(${dragOffset}px)` : undefined,
-        transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.5s ease-out',
-        opacity: Math.max(0, 1 - Math.abs(dragOffset) / 300)
+        transition: isDragging ? 'none' : 'transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.45s ease-out',
+        opacity: Math.max(0, 1 - Math.abs(dragOffset) / 300),
       }}
-      onTouchStart={e => handleDragStart(e.touches[0].clientX)}
-      onTouchMove={e => handleDragMove(e.touches[0].clientX)}
+      onTouchStart={(e) => handleDragStart(e.touches[0].clientX)}
+      onTouchMove={(e) => handleDragMove(e.touches[0].clientX)}
       onTouchEnd={handleDragEnd}
-      onMouseDown={e => handleDragStart(e.clientX)}
-      onMouseMove={e => handleDragMove(e.clientX)}
+      onMouseDown={(e) => handleDragStart(e.clientX)}
+      onMouseMove={(e) => handleDragMove(e.clientX)}
       onMouseUp={handleDragEnd}
       onMouseLeave={handleDragEnd}
     >
@@ -85,29 +86,33 @@ const ToastItem: React.FC<{ toast: Toast, onRemove: (id: number, skipAnim?: bool
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const seqRef = useRef(1);
 
   const removeToast = useCallback((id: number, skipAnim = false) => {
     if (skipAnim) {
-      setToasts(prev => prev.filter(t => t.id !== id));
+      setToasts((prev) => prev.filter((t) => t.id !== id));
       return;
     }
-    setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
     setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 400); // Wait for the full CSS animation if not skipping
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 400);
   }, []);
 
-  const showToast = useCallback((type: Toast['type'], title: string, message: string) => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, type, title, message }]);
-    setTimeout(() => removeToast(id), 4000);
-  }, [removeToast]);
+  const showToast = useCallback(
+    (type: Toast['type'], title: string, message: string) => {
+      const id = Date.now() * 1000 + (seqRef.current++ % 1000);
+      setToasts((prev) => [...prev.slice(-4), { id, type, title, message }]);
+      setTimeout(() => removeToast(id), 4000);
+    },
+    [removeToast]
+  );
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
       <div className="toast-container">
-        {toasts.map(toast => (
+        {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
         ))}
       </div>

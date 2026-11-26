@@ -123,6 +123,7 @@
 button, a, label, [role="button"] {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
+  touch-action: manipulation;
   user-select: none;
   outline: none;
 }
@@ -190,6 +191,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .app-container {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .main-content {
@@ -200,12 +202,24 @@ h1, h2, h3, h4, h5, h6 {
   min-width: 0;
 }
 
+.settings-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ai-chat-container {
+  height: calc(100vh - 65px);
+  height: calc(100dvh - 65px);
+}
+
 /* ==========================================================================
    6. Login Page
    ========================================================================== */
 
 .login-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1068,6 +1082,16 @@ tr:hover td {
   to   { opacity: 1; }
 }
 
+@keyframes modal-fade-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.fade-in,
+.animate-fade-in {
+  animation: fade-in 0.22s ease-out;
+}
+
 @keyframes modal-enter {
   from { opacity: 0; transform: scale(0.9) translateY(20px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
@@ -1144,6 +1168,15 @@ tr:hover td {
   animation: spin 0.7s linear infinite;
 }
 
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -1197,15 +1230,15 @@ tr:hover td {
   }
 }
 
-/* --- Tablet Portrait & Mobile (≤ 768px) --- */
-@media (max-width: 768px) {
+/* --- Tablet Portrait & Mobile (< 768px) --- */
+@media (max-width: 767px) {
   .app-container {
     flex-direction: column;
   }
 }
 
-/* --- Tablet Portrait Only (600px - 768px) --- */
-@media (min-width: 600px) and (max-width: 768px) {
+/* --- Large Phone / Mini Tablet (600px - 767px) --- */
+@media (min-width: 600px) and (max-width: 767px) {
   .product-grid {
     grid-template-columns: repeat(3, 1fr) !important;
   }
@@ -1217,10 +1250,19 @@ tr:hover td {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* Main Content – padding on mobile */
   .main-content {
-    padding: 4.5rem 0.75rem 5rem 0.75rem;
+    padding: 4.5rem 0.75rem calc(5.5rem + env(safe-area-inset-bottom, 0px)) 0.75rem;
+  }
+
+  .settings-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-chat-container {
+    height: calc(100vh - 130px);
+    height: calc(100dvh - 130px);
   }
   
   .main-inner {
@@ -1810,7 +1852,7 @@ tr:hover td {
   }
 }
 
-/* Tablet & Mobile (< 1024px) - Ensure main-content has full width */
+/* Tablet & Mobile (< 1024px) - Ensure main-content has full width & prevent iOS Safari input auto-zoom */
 @media (max-width: 1023px) {
   .main-content {
     margin-left: 0 !important;
@@ -1819,6 +1861,24 @@ tr:hover td {
   }
   .top-navbar {
     display: flex !important;
+  }
+}
+
+@media (max-width: 1023px), (hover: none) and (pointer: coarse) {
+  /* Wajib >= 16px agar iOS/iPadOS Safari TIDAK melakukan auto-zoom yang menggeser modal & layar */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea,
+  .form-input,
+  .form-select {
+    font-size: 16px !important;
+  }
+
+  /* Matikan efek melayang hover yang lengket pada layar sentuh (HP & iPad) agar scroll 60fps mulus */
+  .card:hover,
+  .stat-card:hover,
+  .product-card:hover {
+    transform: none !important;
   }
 }
 
@@ -1844,7 +1904,7 @@ input[type=number] {
   display: block !important;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* Mobile: Show toggle button, hide payment options by default */
   .payment-toggle-btn {
     display: flex !important;
@@ -1858,7 +1918,7 @@ input[type=number] {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .btn-add-menu {
     font-size: 0.9rem !important;
     padding: 0.75rem 1rem !important;
@@ -1891,15 +1951,19 @@ input[type=number] {
 @media (max-width: 767px) {
   .checkout-footer {
     position: fixed;
-    bottom: 60px; /* Offset for mobile bottom nav */
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px)); /* Offset for mobile bottom nav */
     left: 0;
     right: 0;
+    max-height: calc(100vh - 80px);
+    max-height: calc(100dvh - 80px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     background: var(--color-surface);
     z-index: 100;
-    padding: 0.5rem 1.5rem 1.5rem 1.5rem;
+    padding: 0.5rem 1.25rem 1.5rem 1.25rem;
     border-top-left-radius: 24px;
     border-top-right-radius: 24px;
-    box-shadow: 0 -4px 30px rgba(0,0,0,0.6);
+    box-shadow: 0 -4px 30px rgba(0,0,0,0.45);
     border-top: 1px solid var(--color-border);
     transform: translateY(120%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1967,15 +2031,17 @@ input[type=number] {
 @media (max-width: 767px) {
   .kasir-mode .checkout-footer {
     bottom: 0 !important;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)) !important;
   }
   .kasir-mode .mobile-checkout-toggle {
-    bottom: 16px !important;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   }
-}
-
-@media (max-width: 768px) {
   .kasir-mode.app-container {
     padding-bottom: 0 !important;
+  }
+  .kasir-mode .ai-chat-container {
+    height: calc(100vh - 70px);
+    height: calc(100dvh - 70px);
   }
 }
 

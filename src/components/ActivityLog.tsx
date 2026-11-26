@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { getActivityLogs } from '../utils/storage';
 import type { ActivityLog as ActivityLogType } from '../types';
 import { Clock } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { safeFormatDate } from '../utils/format';
 
 const ActivityLog = () => {
   const [logs, setLogs] = useState<ActivityLogType[]>([]);
@@ -81,7 +81,7 @@ const ActivityLog = () => {
                     <td className="text-sm text-secondary font-medium" style={{ whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Clock size={14} />
-                        {format(parseISO(log.created_at), "dd MMM yyyy, HH:mm", { locale: id })}
+                        {safeFormatDate(log.created_at, "dd MMM yyyy, HH:mm", { locale: id })}
                       </div>
                     </td>
                     <td>

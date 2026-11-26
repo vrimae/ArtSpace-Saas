@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Mail, Store, Save, Moon, Sun, Phone, Tag, Plus, Trash2, Pencil, Check, X, Send, MessageCircle } from 'lucide-react';
+import { User, Lock, Mail, Store, Save, Moon, Sun, Phone, Tag, Plus, Trash2, Pencil, Check, X, Send, MessageCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { getCategories, saveCategories, renameCategoryInItems } from '../utils/storage';
+import { getCategories, saveCategories, renameCategoryInItems, getUser, invalidateAllDataCaches } from '../utils/storage';
+import { clearSystemCacheSafely, APP_CACHE_VERSION } from '../utils/systemCache';
 import { useToast } from './Toast';
 import { AuthContext } from '../App';
 
@@ -69,7 +70,7 @@ const Settings = () => {
   const [waDeviceStatus, setWaDeviceStatus] = useState<{ checked: boolean; loading: boolean; phone?: string; name?: string; status?: string; error?: string }>({ checked: false, loading: false });
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem('theme');
+    const savedTheme = localStorage.getItem('theme') || localStorage.getItem('vrimae_theme');
     if (savedTheme) return savedTheme === 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
@@ -85,7 +86,7 @@ const Settings = () => {
   const [confirmPinInput, setConfirmPinInput] = useState('');
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getUser().then((user: any) => {
       if (user) {
         const isSuperAdmin = user.email === 'bimdarmawa2@gmail.com' || user.email === 'vrimae23@gmail.com';
         const defaultWaToken = isSuperAdmin ? 'SbmGAc1TxotP4TGuCGpS' : '';
@@ -188,7 +189,9 @@ const Settings = () => {
     if (window.confirm("Fitur ini akan memindai semua produk Anda dan memulihkan kategori yang hilang. Lanjutkan?")) {
       setLoading(true);
       try {
-        const { data: items } = await supabase.from('items').select('category');
+        const user = await getUser();
+        if (!user) throw new Error('Sesi tidak ditemukan');
+        const { data: items } = await supabase.from('products').select('category').eq('user_id', user.id);
         if (items && items.length > 0) {
           const usedCategories = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
           const currentCategories = Array.isArray(categories) ? categories : [];
@@ -199,7 +202,7 @@ const Settings = () => {
         } else {
           showToast('info', 'Info', 'Tidak ditemukan kategori pada produk Anda.');
         }
-      } catch (err) {
+      } catch {
         showToast('error', 'Gagal', 'Terjadi kesalahan saat memulihkan kategori.');
       } finally {
         setLoading(false);
@@ -213,9 +216,27 @@ const Settings = () => {
     if (nextTheme) {
       document.documentElement.setAttribute('data-theme', 'dark');
       localStorage.setItem('theme', 'dark');
+      localStorage.setItem('vrimae_theme', 'dark');
     } else {
       document.documentElement.removeAttribute('data-theme');
       localStorage.setItem('theme', 'light');
+      localStorage.setItem('vrimae_theme', 'light');
+    }
+  };
+
+  const handleClearSystemCache = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await clearSystemCacheSafely(async () => {
+        invalidateAllDataCaches();
+        await getUser(true);
+      });
+      showToast('success', 'Cache Dibersihkan!', 'Cache sementara sistem berhasil disegarkan tanpa menghapus data bisnis atau sesi login.');
+    } catch {
+      showToast('error', 'Gagal', 'Tidak dapat membersihkan cache sementara.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -251,12 +272,16 @@ const Settings = () => {
           }
         }
 
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = Math.round(width);
+        canvas.height = Math.round(height);
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          canvas.width = 0;
+          canvas.height = 0;
           setFormData(prev => ({ ...prev, avatarUrl: dataUrl }));
         }
       };
@@ -320,6 +345,9 @@ const Settings = () => {
       const { error } = await supabase.auth.updateUser(updates);
 
       if (error) throw error;
+
+      invalidateAllDataCaches();
+      await getUser(true);
 
       showToast('success', 'Berhasil', 'Profil Anda telah diperbarui');
       setFormData(prev => ({ ...prev, oldPassword: '', newPassword: '', confirmPassword: '' }));
@@ -467,6 +495,7 @@ const Settings = () => {
         data: { admin_pin: pinInput || null }
       });
       if (error) throw error;
+      invalidateAllDataCaches();
       
       showToast('success', 'Berhasil', pinInput ? 'PIN Admin berhasil disimpan. Sistem kini bisa dilock ke Mode Kasir.' : 'PIN Admin berhasil dihapus. Sistem terbuka untuk semua.');
       setPinInput('');
@@ -519,6 +548,24 @@ const Settings = () => {
                 width: 22, height: 22, borderRadius: '50%', background: 'white',
                 boxShadow: '0 2px 6px rgba(0,0,0,0.2)', transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)', display: 'block',
               }} />
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', padding: '1rem', marginTop: '0.75rem', background: 'var(--color-surface-alt)', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+            <div style={{ flex: '1 1 220px' }}>
+              <div style={{ fontWeight: 700, color: 'var(--color-text)' }}>Optimasi & Bersihkan Cache Sistem</div>
+              <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                Segarkan memori & cache sementara aplikasi ({APP_CACHE_VERSION}) agar ringan di semua perangkat. Data transaksi, stok, akun, dan setelan toko 100% aman.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearSystemCache}
+              disabled={loading}
+              className="btn btn-outline"
+              style={{ padding: '0.6rem 1rem', fontSize: '0.85rem', borderColor: 'var(--color-primary)', color: 'var(--color-primary)', fontWeight: 700, flexShrink: 0 }}
+            >
+              <RefreshCw size={15} /> Bersihkan Cache
             </button>
           </div>
 
@@ -643,7 +690,7 @@ const Settings = () => {
                   Kirim laporan setiap ada transaksi baru langsung ke chat Telegram Anda. Buat bot baru di <strong>@BotFather</strong> untuk mendapatkan Token.
                 </p>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="settings-grid-2">
                   <div className="form-group mb-0">
                     <label className="form-label">Telegram Bot Token</label>
                     <input 
@@ -698,7 +745,7 @@ const Settings = () => {
                 </div>
 
                 {formData.waGatewayProvider === 'fonnte' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div className="settings-grid-2" style={{ marginBottom: '1rem' }}>
                     <div className="form-group mb-0">
                       <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                         <span>Token API Fonnte</span>
@@ -728,7 +775,7 @@ const Settings = () => {
                 )}
 
                 {formData.waGatewayProvider === 'watzap' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div className="settings-grid-2" style={{ marginBottom: '1rem' }}>
                     <div className="form-group mb-0">
                       <label className="form-label" style={{ marginBottom: '0.4rem' }}>API Key (Watzap)</label>
                       <input 

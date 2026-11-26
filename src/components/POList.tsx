@@ -68,7 +68,12 @@ const POList = () => {
     else if (phone.startsWith('8')) phone = '62' + phone;
     
     const formatCurrencyLocal = (num: number) => 'Rp ' + Math.round(num || 0).toLocaleString('id-ID');
-    const itemDetails = tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:.*? - /i, '').trim();
+    const itemDetails = (tx.description || '')
+      .replace(/^(?:\[PO\|[^\]]*\]\s*)+/i, '')
+      .replace(/^\[[^\]]+\]\s*/i, '')
+      .replace(/\[WA:\s*[^\]]+\]/gi, '')
+      .replace(/Pesanan:\s*.*?\s*-\s*/i, '')
+      .trim();
     
     const customerNameVal = tx.customerName || 'Member';
     const shopNameVal = waGatewayConfig.shopName || 'Vrimae';
@@ -147,15 +152,24 @@ const POList = () => {
     }
   };
 
+  const cleanOrderText = (desc: string) =>
+    (desc || '')
+      .replace(/^(?:\[PO\|[^\]]*\]\s*)+/i, '')
+      .replace(/^\[[^\]]+\]\s*/i, '')
+      .replace(/\[WA:\s*[^\]]+\]/gi, '')
+      .replace(/Pesanan:\s*.*?\s*-\s*/i, '')
+      .trim();
+
   const handleEditClick = (tx: Transaction) => {
+    const methodMatch = tx.description.match(/^\[([^\]]+)\]\s/);
     setEditData({
       customerName: tx.customerName || '',
       customerPhone: tx.customerPhone || '',
       poPickupDate: tx.poPickupDate ? safeFormatDate(tx.poPickupDate, "yyyy-MM-dd'T'HH:mm") : '',
-      description: tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:\s*/i, ''),
+      description: cleanOrderText(tx.description),
       poTotalAmount: tx.poTotalAmount || tx.amount,
       poDpAmount: tx.poDpAmount !== undefined ? tx.poDpAmount : tx.amount,
-      paymentMethod: 'Tunai'
+      paymentMethod: methodMatch ? methodMatch[1] : 'Tunai'
     });
     setEditModal({ isOpen: true, tx });
   };
@@ -186,8 +200,10 @@ const POList = () => {
         }, 'Admin', 'Pengembalian kelebihan DP PO');
       }
 
-      const formattedDate = editData.poPickupDate ? safeFormatDate(editData.poPickupDate, 'dd MMM, HH:mm') : '-';
-      const formattedDesc = `[PO|${formattedDate}] Pesanan: ${editData.customerName || 'Umum'} - ${editData.description}`;
+      const cleanPhone = (editData.customerPhone || '').replace(/\D/g, '').replace(/^(62|0)/, '');
+      const waSuffix = cleanPhone ? ` [WA: ${cleanPhone}]` : '';
+      // Jangan tambahkan prefix [PO|...] manual di sini karena updateTransaction -> encodeTransactionDescription sudah menyimpannya secara otomatis
+      const formattedDesc = `[${editData.paymentMethod}] Pesanan: ${editData.customerName || 'Umum'} - ${cleanOrderText(editData.description)}${waSuffix}`;
 
       await updateTransaction(tx.id, {
         customerName: editData.customerName,
@@ -201,7 +217,7 @@ const POList = () => {
       showToast('success', 'Berhasil', 'Data PO berhasil diperbarui.');
       setEditModal({ isOpen: false, tx: null });
       fetchPOs();
-    } catch (err) {
+    } catch {
       showToast('error', 'Gagal', 'Terjadi kesalahan saat menyimpan perubahan.');
     }
   };
@@ -224,7 +240,7 @@ const POList = () => {
     try {
       await updateTransaction(tx.id, { poStatus: 'selesai' }, 'Admin', 'Menandai PO selesai');
       
-      const itemDetails = tx.description.replace(/\[PO\|.*?\]\s/i, '').replace(/Pesanan:.*? - /i, '').trim();
+      const itemDetails = cleanOrderText(tx.description);
       await addTransaction({
         type: 'income',
         amount: sisa,
@@ -249,14 +265,16 @@ const POList = () => {
       return;
     }
     
-    // Auto format phone number
     let formattedPhone = phone.replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) {
       formattedPhone = '62' + formattedPhone.substring(1);
+    } else if (formattedPhone.startsWith('8')) {
+      formattedPhone = '62' + formattedPhone;
     }
 
-    const itemDetails = tx.description.replace(/Pesanan:.*? - /i, '').trim();
-    const text = `Halo Kak ${tx.customerName || ''}, pesanan Pre-Order Anda (${itemDetails}) sudah dapat diambil di Vrimae ArtSpace. Terima kasih!`;
+    const itemDetails = cleanOrderText(tx.description);
+    const shopLabel = waGatewayConfig.shopName || 'Vrimae ArtSpace';
+    const text = `Halo Kak ${tx.customerName || ''}, pesanan Pre-Order Anda (${itemDetails}) sudah dapat diambil di ${shopLabel}. Terima kasih!`;
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -332,7 +350,7 @@ const POList = () => {
                       {t.customerPhone && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 400 }}>{t.customerPhone}</div>}
                     </td>
                     <td className="text-sm">
-                      {t.description.replace(/\[QRIS\]\s*/i, '').replace(/Pesanan:.*? - /i, '')}
+                      {cleanOrderText(t.description)}
                     </td>
                     <td className="text-right text-sm">
                       <div className="font-bold">{formatCurrency(t.poTotalAmount || t.amount)}</div>
@@ -411,6 +429,7 @@ const POList = () => {
                   <label className="form-label">Total Harga PO (Rp)</label>
                   <input 
                     type="text" 
+                    inputMode="numeric"
                     className="form-input" 
                     value={editData.poTotalAmount === 0 ? '' : editData.poTotalAmount.toLocaleString('id-ID')} 
                     onChange={e => {
@@ -423,6 +442,7 @@ const POList = () => {
                   <label className="form-label">DP yang Sudah Dibayar (Rp)</label>
                   <input 
                     type="text" 
+                    inputMode="numeric"
                     className="form-input" 
                     value={editData.poDpAmount === 0 ? '' : editData.poDpAmount.toLocaleString('id-ID')} 
                     onChange={e => {

@@ -1,25 +1,27 @@
-import { useState, useEffect, useRef, createContext, useContext, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { LayoutDashboard, Wallet, PackageOpen, ShoppingCart, LogOut, Settings, Menu, Activity, Lock, Unlock, Bot, ShieldCheck, Clock } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary';
+import { lazyWithRetry, runStartupCacheMaintenance } from './utils/systemCache';
 
-const Dashboard = lazy(() => import('./components/Dashboard'));
-const Finance = lazy(() => import('./components/Finance'));
-const Inventory = lazy(() => import('./components/Inventory'));
-const POS = lazy(() => import('./components/POS'));
-const SettingsPage = lazy(() => import('./components/Settings'));
-const Login = lazy(() => import('./components/Login'));
-const AnalyticsPro = lazy(() => import('./components/AnalyticsPro'));
-const AiAssistant = lazy(() => import('./components/AiAssistant'));
-const ActivityLog = lazy(() => import('./components/ActivityLog'));
-const SuperAdmin = lazy(() => import('./components/SuperAdmin'));
-const POList = lazy(() => import('./components/POList'));
+const Dashboard = lazyWithRetry(() => import('./components/Dashboard'));
+const Finance = lazyWithRetry(() => import('./components/Finance'));
+const Inventory = lazyWithRetry(() => import('./components/Inventory'));
+const POS = lazyWithRetry(() => import('./components/POS'));
+const SettingsPage = lazyWithRetry(() => import('./components/Settings'));
+const Login = lazyWithRetry(() => import('./components/Login'));
+const AnalyticsPro = lazyWithRetry(() => import('./components/AnalyticsPro'));
+const AiAssistant = lazyWithRetry(() => import('./components/AiAssistant'));
+const ActivityLog = lazyWithRetry(() => import('./components/ActivityLog'));
+const SuperAdmin = lazyWithRetry(() => import('./components/SuperAdmin'));
+const POList = lazyWithRetry(() => import('./components/POList'));
 import { ToastProvider, useToast } from './components/Toast';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { supabase } from './lib/supabase';
-import { initStorage } from './utils/storage';
+import { initStorage, invalidateAllDataCaches } from './utils/storage';
 
 initStorage();
+runStartupCacheMaintenance(invalidateAllDataCaches);
 
 export const AuthContext = createContext<{ isAdmin: boolean, setIsAdmin: (val: boolean) => void, adminPin: string | null, setAdminPin: (pin: string | null) => void }>({ isAdmin: true, setIsAdmin: () => {}, adminPin: null, setAdminPin: () => {} });
 
@@ -77,7 +79,7 @@ const Sidebar = ({
       else document.documentElement.removeAttribute('data-theme');
     };
 
-    const savedTheme = localStorage.getItem('theme');
+    const savedTheme = localStorage.getItem('theme') || localStorage.getItem('vrimae_theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
     
     if (savedTheme) {
@@ -87,7 +89,7 @@ const Sidebar = ({
     }
 
     const handleSystemThemeChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('theme')) {
+      if (!localStorage.getItem('theme') && !localStorage.getItem('vrimae_theme')) {
         applyTheme(e.matches);
       }
     };
@@ -361,6 +363,23 @@ const AuthListener = () => {
   return null;
 };
 
+const LoadingSpinner = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', width: '100%', background: 'var(--color-bg)' }}>
+    <div style={{ border: '4px solid rgba(59, 130, 246, 0.12)', borderTopColor: '#3b82f6', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 0.8s linear infinite' }}></div>
+  </div>
+);
+
+const MainContainer = ({ children }: { children: React.ReactNode }) => {
+  const routerLocation = useLocation();
+  return (
+    <main className={`main-content ${routerLocation.pathname === '/pos' ? 'pos-mode' : ''}`}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto' }} className="main-inner">
+        {children}
+      </div>
+    </main>
+  );
+};
+
 // ── App ─────────────────────────────────────────────────────────────────────
 const App = () => {
   const [session, setSession] = useState<any>(null);
@@ -621,15 +640,17 @@ const App = () => {
     );
   }
 
-  if (recoveryMode || !session) return <ToastProvider><Login initialViewMode={recoveryMode ? 'reset_password' : 'login'} /></ToastProvider>;
-
-  // Loading spinner untuk suspense
-  const LoadingSpinner = () => (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
-      <div style={{ border: '4px solid rgba(59, 130, 246, 0.1)', borderTopColor: '#3b82f6', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }}></div>
-      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
+  if (recoveryMode || !session) {
+    return (
+      <ErrorBoundary>
+        <ToastProvider>
+          <Suspense fallback={<LoadingSpinner />}>
+            <Login initialViewMode={recoveryMode ? 'reset_password' : 'login'} />
+          </Suspense>
+        </ToastProvider>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -678,10 +699,9 @@ const App = () => {
         />
 
         {/* Main Content — dibawah navbar */}
-        <main className={`main-content ${location.pathname === '/pos' ? 'pos-mode' : ''}`}>
-          <div style={{ maxWidth: '1280px', margin: '0 auto' }} className="main-inner">
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
+        <MainContainer>
+          <Suspense fallback={<LoadingSpinner />}>
+            <Routes>
               <Route path="/pos" element={<POS />} />
               <Route path="/po" element={<POList />} />
               <Route path="/activity" element={<ActivityLog />} />
@@ -719,10 +739,10 @@ const App = () => {
                   <SettingsPage />
                 </ProtectedRoute>
               } />
-              </Routes>
-            </Suspense>
-          </div>
-        </main>
+              <Route path="*" element={<Navigate to={isAdmin ? '/' : '/pos'} replace />} />
+            </Routes>
+          </Suspense>
+        </MainContainer>
 
         {/* ── Mobile Bottom Navbar ── */}
         <MobileBottomNav />

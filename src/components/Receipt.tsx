@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { formatCurrency, safeFormatDate } from '../utils/format';
-import { supabase } from '../lib/supabase';
+import { getUser } from '../utils/storage';
 import { Printer, X } from 'lucide-react';
 
 interface ReceiptProps {
@@ -135,8 +135,9 @@ export default function Receipt({ transaction, showPreviewModal, onClosePreview 
   });
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.user_metadata) {
+    let mounted = true;
+    getUser().then((user: any) => {
+      if (mounted && user?.user_metadata) {
         setStoreInfo({
           shopName: user.user_metadata.shop_name || 'Vrimae Store',
           address: user.user_metadata.receipt_address || '',
@@ -146,6 +147,9 @@ export default function Receipt({ transaction, showPreviewModal, onClosePreview 
         });
       }
     });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (!transaction) return null;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getInventory, addInventory, updateInventory, deleteInventory, addTransaction } from '../utils/storage';
 import { exportToCSV, exportToExcel } from '../utils/export';
 import type { InventoryItem } from '../types';
+import { format } from 'date-fns';
 import { Plus, Download, Pencil, Trash2, Calendar, X } from 'lucide-react';
 import { useToast } from './Toast';
 import { safeFormatDate } from '../utils/format';
@@ -21,7 +22,7 @@ const Inventory = () => {
   const standardUnits = ['pcs', 'unit', 'box', 'pack', 'set', 'meter', 'roll', 'gram', 'kg', 'ml', 'liter', 'botol', 'sachet', 'dus'];
   
   const [formData, setFormData] = useState({
-    name: '', category: 'Barang / Produk Utama', quantity: '', unit: 'pcs', unitPrice: '', date: new Date().toISOString().split('T')[0]
+    name: '', category: 'Barang / Produk Utama', quantity: '', unit: 'pcs', unitPrice: '', date: format(new Date(), 'yyyy-MM-dd')
   });
 
   const fetchData = async () => {
@@ -35,7 +36,7 @@ const Inventory = () => {
 
   const openAddModal = () => {
     setEditingId(null);
-    setFormData({ name: '', category: 'Barang / Produk Utama', quantity: '', unit: 'pcs', unitPrice: '', date: new Date().toISOString().split('T')[0] });
+    setFormData({ name: '', category: 'Barang / Produk Utama', quantity: '', unit: 'pcs', unitPrice: '', date: format(new Date(), 'yyyy-MM-dd') });
     setCustomUnit('');
     setIsModalOpen(true);
   };

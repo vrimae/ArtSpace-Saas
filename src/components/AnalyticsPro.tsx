@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { checkAnalyticsAccess, getTransactions, getInventory, getProducts, getUser } from '../utils/storage';
 import { supabase } from '../lib/supabase';
 import { Crown, Lock, TrendingUp, PackageOpen, ArrowDownRight, ArrowUpRight, ArrowRight, Wallet, Calendar, ChevronDown, Users } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import type { Transaction, InventoryItem, Product } from '../types';
-import { format, subDays, isAfter, startOfDay, isSameDay, startOfMonth, endOfMonth, subMonths, isSameMonth, startOfYear, endOfYear, subYears, isSameYear, parseISO, getWeekOfMonth } from 'date-fns';
+import { format, subDays, isAfter, startOfDay, isSameDay, startOfMonth, endOfMonth, subMonths, isSameMonth, startOfYear, endOfYear, subYears, isSameYear, getWeekOfMonth } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { safeParseDate } from '../utils/format';
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+  return 'Rp ' + Math.round(amount || 0).toLocaleString('id-ID');
 };
 
 const formatShortCurrency = (val: number) => {
@@ -31,63 +32,63 @@ const AnalyticsPro = () => {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   
   useEffect(() => {
+    let isMounted = true;
+    let subscription: any = null;
+
     const init = async () => {
       setLoading(true);
       try {
         const proStatus = await checkAnalyticsAccess();
+        if (!isMounted) return;
         setIsPro(proStatus);
-        
-        if (proStatus) {
-          const fetchInitial = async () => {
-            const [txs, inv, prods] = await Promise.all([
-              getTransactions(),
-              getInventory(),
-              getProducts()
-            ]);
-            setAllTransactions(txs);
-            setInventory(inv);
-            setProducts(prods);
-          };
-          
-          await fetchInitial();
 
-          const user = await getUser();
-          let subscription: any = null;
-          if (user) {
+        if (proStatus) {
+          const [txs, inv, prods, user] = await Promise.all([
+            getTransactions(500, 0),
+            getInventory(),
+            getProducts(),
+            getUser(),
+          ]);
+          if (!isMounted) return;
+          setAllTransactions(txs);
+          setInventory(inv);
+          setProducts(prods);
+
+          if (user && isMounted) {
             subscription = supabase
               .channel(`transactions_channel_${user.id}`)
-              .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'transactions',
-                filter: `user_id=eq.${user.id}`
-              }, () => {
-                getTransactions().then(setAllTransactions);
-              })
+              .on(
+                'postgres_changes',
+                {
+                  event: '*',
+                  schema: 'public',
+                  table: 'transactions',
+                  filter: `user_id=eq.${user.id}`,
+                },
+                () => {
+                  if (isMounted) {
+                    getTransactions(500, 0, true).then((fresh) => {
+                      if (isMounted) setAllTransactions(fresh);
+                    });
+                  }
+                }
+              )
               .subscribe();
           }
-
-          setLoading(false);
-
-          return () => {
-            if (subscription) {
-              supabase.removeChannel(subscription);
-            }
-          };
-        } else {
-          setLoading(false);
         }
       } catch (error) {
-        console.error("Error loading analytics:", error);
-        setLoading(false);
+        console.error('Error loading analytics:', error);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
-    
-    const cleanup = init();
+
+    init();
     return () => {
-      cleanup.then(cleanFn => {
-        if (typeof cleanFn === 'function') cleanFn();
-      });
+      isMounted = false;
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
     };
   }, []);
 
@@ -115,213 +116,235 @@ const AnalyticsPro = () => {
     );
   }
 
-  // --- Filtering Logic ---
-  const now = new Date();
-  let currentTransactions: Transaction[] = [];
-  let previousTransactions: Transaction[] = [];
-  let trendData: any[] = [];
-  let trendTitle = '';
+  // --- Memoized Analytics Calculations (Anti-Lag & Safari Safe) ---
+  const analyticsMetrics = useMemo(() => {
+    const now = new Date();
+    let currentTransactions: Transaction[] = [];
+    let previousTransactions: Transaction[] = [];
+    let trendData: any[] = [];
+    let trendTitle = '';
 
-  if (timeFilter === 'today') {
-    trendTitle = 'Tren Pendapatan (Hari Ini vs Kemarin)';
-    currentTransactions = allTransactions.filter(t => isSameDay(parseISO(t.date), now));
-    previousTransactions = allTransactions.filter(t => isSameDay(parseISO(t.date), subDays(now, 1)));
-    
-    // For today, trend data shows cumulative income by hour
-    trendData = Array.from({ length: 24 }, (_, i) => ({
-      displayDate: `${i.toString().padStart(2, '0')}:00`,
-      income: 0,
-      kemarin: 0
-    }));
+    if (timeFilter === 'today') {
+      trendTitle = 'Tren Pendapatan (Hari Ini vs Kemarin)';
+      currentTransactions = allTransactions.filter(t => isSameDay(safeParseDate(t.date), now));
+      previousTransactions = allTransactions.filter(t => isSameDay(safeParseDate(t.date), subDays(now, 1)));
 
-    currentTransactions.filter(t => t.type === 'income').forEach(t => {
-      const hour = parseISO(t.date).getHours();
-      trendData[hour].income += t.amount;
-    });
-    
-    previousTransactions.filter(t => t.type === 'income').forEach(t => {
-      const hour = parseISO(t.date).getHours();
-      trendData[hour].kemarin += t.amount;
-    });
+      trendData = Array.from({ length: 24 }, (_, i) => ({
+        displayDate: `${i.toString().padStart(2, '0')}:00`,
+        income: 0,
+        kemarin: 0
+      }));
 
-    let cumToday = 0;
-    let cumYesterday = 0;
-    const currentHour = now.getHours();
+      currentTransactions.filter(t => t.type === 'income').forEach(t => {
+        const hour = safeParseDate(t.date).getHours();
+        if (trendData[hour]) trendData[hour].income += t.amount;
+      });
 
-    for (let i = 0; i < 24; i++) {
-      cumToday += trendData[i].income;
-      cumYesterday += trendData[i].kemarin;
-      
-      trendData[i].kemarin = cumYesterday;
-      if (i <= currentHour) {
-        trendData[i].income = cumToday;
-      } else {
-        trendData[i].income = null;
-      }
-    }
-  } else if (timeFilter === '7days') {
-    trendTitle = 'Tren Pendapatan (7 Hari Terakhir)';
-    const sevenDaysAgo = startOfDay(subDays(now, 6));
-    const fourteenDaysAgo = startOfDay(subDays(now, 13));
-    
-    currentTransactions = allTransactions.filter(t => isAfter(parseISO(t.date), sevenDaysAgo) || isSameDay(parseISO(t.date), sevenDaysAgo));
-    previousTransactions = allTransactions.filter(t => (isAfter(parseISO(t.date), fourteenDaysAgo) || isSameDay(parseISO(t.date), fourteenDaysAgo)) && !isAfter(parseISO(t.date), sevenDaysAgo) && !isSameDay(parseISO(t.date), sevenDaysAgo));
+      previousTransactions.filter(t => t.type === 'income').forEach(t => {
+        const hour = safeParseDate(t.date).getHours();
+        if (trendData[hour]) trendData[hour].kemarin += t.amount;
+      });
 
-    trendData = Array.from({ length: 7 }, (_, i) => {
-      const d = subDays(now, 6 - i);
-      return { dateStr: format(d, 'yyyy-MM-dd'), displayDate: format(d, 'dd MMM', { locale: id }), income: 0 };
-    });
-    currentTransactions.filter(t => t.type === 'income').forEach(t => {
-      const txDateStr = format(parseISO(t.date), 'yyyy-MM-dd');
-      const day = trendData.find(d => d.dateStr === txDateStr);
-      if (day) day.income += t.amount;
-    });
-  } else if (timeFilter === 'month') {
-    trendTitle = 'Tren Pendapatan (Bulan Ini)';
-    const startOfPrevMonth = startOfMonth(subMonths(now, 1));
-    const endOfPrevMonth = endOfMonth(subMonths(now, 1));
+      let cumToday = 0;
+      let cumYesterday = 0;
+      const currentHour = now.getHours();
 
-    currentTransactions = allTransactions.filter(t => isSameMonth(parseISO(t.date), now));
-    previousTransactions = allTransactions.filter(t => isAfter(parseISO(t.date), startOfPrevMonth) && !isAfter(parseISO(t.date), endOfPrevMonth));
+      for (let i = 0; i < 24; i++) {
+        cumToday += trendData[i].income;
+        cumYesterday += trendData[i].kemarin;
 
-    // Group by weeks for month
-    trendData = [
-      { displayDate: 'M1', income: 0 }, { displayDate: 'M2', income: 0 }, { displayDate: 'M3', income: 0 }, { displayDate: 'M4', income: 0 }, { displayDate: 'M5', income: 0 }
-    ];
-    currentTransactions.filter(t => t.type === 'income').forEach(t => {
-      const week = getWeekOfMonth(parseISO(t.date)); // 1 to 5
-      if (week >= 1 && week <= 5) {
-        trendData[week - 1].income += t.amount;
-      }
-    });
-  } else if (timeFilter === 'year') {
-    trendTitle = 'Tren Pendapatan (Tahun Ini)';
-    const startOfPrevYear = startOfYear(subYears(now, 1));
-    const endOfPrevYear = endOfYear(subYears(now, 1));
-
-    currentTransactions = allTransactions.filter(t => isSameYear(parseISO(t.date), now));
-    previousTransactions = allTransactions.filter(t => isAfter(parseISO(t.date), startOfPrevYear) && !isAfter(parseISO(t.date), endOfPrevYear));
-
-    trendData = Array.from({ length: 12 }, (_, i) => ({
-      monthIdx: i, displayDate: format(new Date(now.getFullYear(), i, 1), 'MMM', { locale: id }), income: 0
-    }));
-    currentTransactions.filter(t => t.type === 'income').forEach(t => {
-      const m = parseISO(t.date).getMonth();
-      trendData[m].income += t.amount;
-    });
-  }
-
-  // --- Calculate Metrics ---
-  const totalIncome = currentTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-  const totalExpense = currentTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-  const netProfit = totalIncome - totalExpense;
-
-  const prevTotalIncome = previousTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-  
-  // Growth Calculation
-  let growthPercent = 0;
-  if (prevTotalIncome > 0) {
-    growthPercent = ((totalIncome - prevTotalIncome) / prevTotalIncome) * 100;
-  } else if (totalIncome > 0) {
-    growthPercent = 100; // 100% growth if prev was 0 and now we have income
-  }
-  
-  let growthText = 'Sama';
-  let growthColor = 'var(--color-text-secondary)';
-  let GrowthIcon = ArrowRight;
-  if (growthPercent > 0) {
-    growthText = `Naik ${Math.abs(growthPercent).toFixed(1)}%`;
-    growthColor = '#10B981';
-    GrowthIcon = ArrowUpRight;
-  } else if (growthPercent < 0) {
-    growthText = `Turun ${Math.abs(growthPercent).toFixed(1)}%`;
-    growthColor = '#EF4444';
-    GrowthIcon = ArrowDownRight;
-  }
-  
-  let growthComparisonText = '';
-  if (timeFilter === 'today') growthComparisonText = 'dibanding kemarin';
-  if (timeFilter === '7days') growthComparisonText = 'dibanding minggu lalu';
-  if (timeFilter === 'month') growthComparisonText = 'dibanding bulan lalu';
-  if (timeFilter === 'year') growthComparisonText = 'dibanding tahun lalu';
-
-  // --- Top Products Logic ---
-  // Parse descriptions: "[Tunai] Pesanan: Budi - Kopi Aren (+Boba) (2x), Matcha (1x)"
-  const productMap: Record<string, { name: string, qty: number }> = {};
-  const categoryMap: Record<string, number> = {};
-  
-  currentTransactions.filter(t => t.type === 'income' && t.description.includes('Pesanan:')).forEach(t => {
-    const parts = t.description.split(' - ');
-    if (parts.length > 1) {
-      const itemsStr = parts.slice(1).join(' - ');
-      const regex = /(?:^|,\s*)(.*?)\s*\((\d+)x\)/g;
-      let match;
-      while ((match = regex.exec(itemsStr)) !== null) {
-        let namePart = match[1].trim();
-        // Remove addons and extras formatting like (+Boba) or (?Es Sedikit)
-        namePart = namePart.replace(/\s*\(\+[^)]+\)/g, '').replace(/\s*\(\?[^)]+\)/g, '');
-        // Remove note formatting like [Catatan: xyz]
-        namePart = namePart.replace(/\s*\[Catatan:[^\]]+\]/g, '').trim();
-        const qty = parseInt(match[2], 10);
-        if (!isNaN(qty) && namePart) {
-          const lowerName = namePart.toLowerCase();
-          
-          if (!productMap[lowerName]) {
-            productMap[lowerName] = { name: namePart, qty: 0 };
-          }
-          productMap[lowerName].qty += qty;
-          
-          // Category Tracking
-          const cleanName = lowerName.trim();
-          const prodItem = products.find(p => p.name.toLowerCase().trim() === cleanName);
-          const invItem = !prodItem ? inventory.find(i => {
-            const iName = i.name.toLowerCase();
-            return iName.trim() === cleanName || iName.split('|||')[0].trim() === cleanName;
-          }) : null;
-          
-          // Fallback to 'Umum' instead of 'Lainnya' so it matches their default POS category
-          const cat = prodItem?.category || invItem?.category || 'Umum';
-          if (!categoryMap[cat]) categoryMap[cat] = 0;
-          categoryMap[cat] += qty;
+        trendData[i].kemarin = cumYesterday;
+        if (i <= currentHour) {
+          trendData[i].income = cumToday;
+        } else {
+          trendData[i].income = null;
         }
       }
-    }
-  });
-  
-  const topProducts = Object.values(productMap)
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 5);
-    
-  const topCategories = Object.entries(categoryMap)
-    .map(([name, qty]) => ({ name, qty }))
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 5);
+    } else if (timeFilter === '7days') {
+      trendTitle = 'Tren Pendapatan (7 Hari Terakhir)';
+      const sevenDaysAgo = startOfDay(subDays(now, 6));
+      const fourteenDaysAgo = startOfDay(subDays(now, 13));
 
-  // --- Top Customers Logic ---
-  const customerMap: Record<string, number> = {};
-  currentTransactions.filter(t => t.type === 'income').forEach(t => {
-    // Expected format: "[Tunai] Pesanan: Nama Pelanggan - Produk..."
-    const match = t.description.match(/Pesanan:\s*(.*?)\s*-/);
-    if (match && match[1]) {
-      const customerName = match[1].trim();
-      if (customerName && customerName.toLowerCase() !== 'umum') {
-        // Count frequency of transactions
-        customerMap[customerName] = (customerMap[customerName] || 0) + 1;
+      currentTransactions = allTransactions.filter(t => {
+        const dt = safeParseDate(t.date);
+        return isAfter(dt, sevenDaysAgo) || isSameDay(dt, sevenDaysAgo);
+      });
+      previousTransactions = allTransactions.filter(t => {
+        const dt = safeParseDate(t.date);
+        return (isAfter(dt, fourteenDaysAgo) || isSameDay(dt, fourteenDaysAgo)) && !isAfter(dt, sevenDaysAgo) && !isSameDay(dt, sevenDaysAgo);
+      });
+
+      trendData = Array.from({ length: 7 }, (_, i) => {
+        const d = subDays(now, 6 - i);
+        return { dateStr: format(d, 'yyyy-MM-dd'), displayDate: format(d, 'dd MMM', { locale: id }), income: 0 };
+      });
+      currentTransactions.filter(t => t.type === 'income').forEach(t => {
+        const txDateStr = format(safeParseDate(t.date), 'yyyy-MM-dd');
+        const day = trendData.find(d => d.dateStr === txDateStr);
+        if (day) day.income += t.amount;
+      });
+    } else if (timeFilter === 'month') {
+      trendTitle = 'Tren Pendapatan (Bulan Ini)';
+      const startOfPrevMonth = startOfMonth(subMonths(now, 1));
+      const endOfPrevMonth = endOfMonth(subMonths(now, 1));
+
+      currentTransactions = allTransactions.filter(t => isSameMonth(safeParseDate(t.date), now));
+      previousTransactions = allTransactions.filter(t => {
+        const dt = safeParseDate(t.date);
+        return isAfter(dt, startOfPrevMonth) && !isAfter(dt, endOfPrevMonth);
+      });
+
+      trendData = [
+        { displayDate: 'M1', income: 0 }, { displayDate: 'M2', income: 0 }, { displayDate: 'M3', income: 0 }, { displayDate: 'M4', income: 0 }, { displayDate: 'M5', income: 0 }
+      ];
+      currentTransactions.filter(t => t.type === 'income').forEach(t => {
+        const week = getWeekOfMonth(safeParseDate(t.date));
+        if (week >= 1 && week <= 5) {
+          trendData[week - 1].income += t.amount;
+        }
+      });
+    } else if (timeFilter === 'year') {
+      trendTitle = 'Tren Pendapatan (Tahun Ini)';
+      const startOfPrevYear = startOfYear(subYears(now, 1));
+      const endOfPrevYear = endOfYear(subYears(now, 1));
+
+      currentTransactions = allTransactions.filter(t => isSameYear(safeParseDate(t.date), now));
+      previousTransactions = allTransactions.filter(t => {
+        const dt = safeParseDate(t.date);
+        return isAfter(dt, startOfPrevYear) && !isAfter(dt, endOfPrevYear);
+      });
+
+      trendData = Array.from({ length: 12 }, (_, i) => ({
+        monthIdx: i, displayDate: format(new Date(now.getFullYear(), i, 1), 'MMM', { locale: id }), income: 0
+      }));
+      currentTransactions.filter(t => t.type === 'income').forEach(t => {
+        const m = safeParseDate(t.date).getMonth();
+        if (trendData[m]) trendData[m].income += t.amount;
+      });
+    }
+
+    const totalIncome = currentTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalExpense = currentTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const netProfit = totalIncome - totalExpense;
+    const prevTotalIncome = previousTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+
+    let growthPercent = 0;
+    if (prevTotalIncome > 0) {
+      growthPercent = ((totalIncome - prevTotalIncome) / prevTotalIncome) * 100;
+    } else if (totalIncome > 0) {
+      growthPercent = 100;
+    }
+
+    let growthText = 'Sama';
+    let growthColor = 'var(--color-text-secondary)';
+    let GrowthIcon = ArrowRight;
+    if (growthPercent > 0) {
+      growthText = `Naik ${Math.abs(growthPercent).toFixed(1)}%`;
+      growthColor = '#10B981';
+      GrowthIcon = ArrowUpRight;
+    } else if (growthPercent < 0) {
+      growthText = `Turun ${Math.abs(growthPercent).toFixed(1)}%`;
+      growthColor = '#EF4444';
+      GrowthIcon = ArrowDownRight;
+    }
+
+    let growthComparisonText = '';
+    if (timeFilter === 'today') growthComparisonText = 'dibanding kemarin';
+    if (timeFilter === '7days') growthComparisonText = 'dibanding minggu lalu';
+    if (timeFilter === 'month') growthComparisonText = 'dibanding bulan lalu';
+    if (timeFilter === 'year') growthComparisonText = 'dibanding tahun lalu';
+
+    const productMap: Record<string, { name: string, qty: number }> = {};
+    const categoryMap: Record<string, number> = {};
+
+    currentTransactions.filter(t => t.type === 'income' && t.description.includes('Pesanan:')).forEach(t => {
+      const parts = t.description.split(' - ');
+      if (parts.length > 1) {
+        const itemsStr = parts.slice(1).join(' - ').replace(/\[WA:\s*[^\]]+\]/gi, '');
+        const regex = /(?:^|,\s*)(.*?)\s*\((\d+)x\)/g;
+        let match;
+        while ((match = regex.exec(itemsStr)) !== null) {
+          let namePart = match[1].trim();
+          namePart = namePart.replace(/\s*\(\+[^)]+\)/g, '').replace(/\s*\(\?[^)]+\)/g, '').replace(/\s*\(✦[^)]+\)/g, '');
+          namePart = namePart.replace(/\s*\[Catatan:[^\]]+\]/g, '').trim();
+          const qty = parseInt(match[2], 10);
+          if (!isNaN(qty) && namePart) {
+            const lowerName = namePart.toLowerCase();
+            if (!productMap[lowerName]) {
+              productMap[lowerName] = { name: namePart, qty: 0 };
+            }
+            productMap[lowerName].qty += qty;
+
+            const cleanName = lowerName.trim();
+            const prodItem = products.find(p => p.name.toLowerCase().trim() === cleanName);
+            const invItem = !prodItem ? inventory.find(i => {
+              const iName = i.name.toLowerCase();
+              return iName.trim() === cleanName || iName.split('|||')[0].trim() === cleanName;
+            }) : null;
+
+            const cat = prodItem?.category || invItem?.category || 'Umum';
+            if (!categoryMap[cat]) categoryMap[cat] = 0;
+            categoryMap[cat] += qty;
+          }
+        }
       }
-    }
-  });
+    });
 
-  const topCustomers = Object.entries(customerMap)
-    .map(([name, orderCount]) => ({ name, orderCount }))
-    .sort((a, b) => b.orderCount - a.orderCount)
-    .slice(0, 5);
+    const topProducts = Object.values(productMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
+    const topCategories = Object.entries(categoryMap).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty).slice(0, 5);
 
-  const inventoryValue = inventory.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const customerMap: Record<string, number> = {};
+    currentTransactions.filter(t => t.type === 'income').forEach(t => {
+      const match = t.description.match(/Pesanan:\s*(.*?)\s*-/);
+      if (match && match[1]) {
+        const customerName = match[1].trim();
+        if (customerName && customerName.toLowerCase() !== 'umum') {
+          customerMap[customerName] = (customerMap[customerName] || 0) + 1;
+        }
+      }
+    });
 
-  const pieData = [
-    { name: 'Pemasukan', value: totalIncome },
-    { name: 'Pengeluaran', value: totalExpense }
-  ];
+    const topCustomers = Object.entries(customerMap).map(([name, orderCount]) => ({ name, orderCount })).sort((a, b) => b.orderCount - a.orderCount).slice(0, 5);
+    const inventoryValue = inventory.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const pieData = [
+      { name: 'Pemasukan', value: totalIncome },
+      { name: 'Pengeluaran', value: totalExpense }
+    ];
+
+    return {
+      trendData,
+      trendTitle,
+      totalIncome,
+      totalExpense,
+      netProfit,
+      growthText,
+      growthColor,
+      GrowthIcon,
+      growthComparisonText,
+      topProducts,
+      topCategories,
+      topCustomers,
+      inventoryValue,
+      pieData,
+    };
+  }, [allTransactions, inventory, products, timeFilter]);
+
+  const {
+    trendData,
+    trendTitle,
+    totalIncome,
+    totalExpense,
+    netProfit,
+    growthText,
+    growthColor,
+    GrowthIcon,
+    growthComparisonText,
+    topProducts,
+    topCategories,
+    topCustomers,
+    inventoryValue,
+    pieData,
+  } = analyticsMetrics;
 
   return (
     <div className="fade-in" style={{ padding: '1rem 0 3rem' }}>

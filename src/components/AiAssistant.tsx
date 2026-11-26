@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bot, Send, Sparkles, CheckCircle2, Lock, Crown, Trash2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { getTransactions, getInventory, checkAiAccess } from '../utils/storage';
+import { getTransactions, getInventory, checkAiAccess, getUser } from '../utils/storage';
 import { createChatSession } from '../utils/ai';
 import type { Transaction, InventoryItem } from '../types';
 import DOMPurify from 'dompurify';
@@ -20,7 +19,7 @@ const renderMarkdown = (text: string) => {
     }
     if (formattedLine.startsWith('#')) {
       const sanitizedLine = DOMPurify.sanitize(formattedLine.replace(/^#+\s/, ''));
-      return <strong key={index} style={{ display: 'block', marginTop: '1rem', marginBottom: '0.5rem', fontSize: '1.05rem', color: '#fff' }} dangerouslySetInnerHTML={{ __html: sanitizedLine }} />;
+      return <strong key={index} style={{ display: 'block', marginTop: '1rem', marginBottom: '0.5rem', fontSize: '1.05rem', color: 'var(--color-text)' }} dangerouslySetInnerHTML={{ __html: sanitizedLine }} />;
     }
     if (formattedLine.trim()) {
       const sanitizedLine = DOMPurify.sanitize(formattedLine);
@@ -63,11 +62,10 @@ const AiAssistant = () => {
         setIsApproved(approved);
 
         // Load data regardless of approval status so free users can use it
-        const [txs, inv] = await Promise.all([getTransactions(), getInventory()]);
+        const [txs, inv, user] = await Promise.all([getTransactions(), getInventory(), getUser()]);
         setTransactions(txs);
         setInventory(inv);
         
-        const { data: { user } } = await supabase.auth.getUser();
         if (user?.user_metadata?.full_name) {
           setUserName(user.user_metadata.full_name);
         }
@@ -253,7 +251,7 @@ const AiAssistant = () => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)', maxWidth: '900px', margin: '0 auto', position: 'relative', background: 'var(--color-bg)' }}>
+    <div className="ai-chat-container" style={{ display: 'flex', flexDirection: 'column', maxWidth: '900px', margin: '0 auto', position: 'relative', background: 'var(--color-bg)' }}>
       
       {/* Header (Gemini Minimalist) */}
       <div style={{ 

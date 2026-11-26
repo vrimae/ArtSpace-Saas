@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useState, useEffect, useContext, useRef, type FormEvent, type CSSProperties } from 'react';
+import { useState, useEffect, useContext, useRef, useMemo, type FormEvent, type CSSProperties } from 'react';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../utils/format';
 import { ShoppingCart, Check, Trash2, Plus, Minus, Settings, Image as ImageIcon, Pencil, Tag, Search, X, ChevronUp, ChevronDown, Printer, CheckCircle, Lock, MessageCircle, Phone } from 'lucide-react';
@@ -69,6 +69,7 @@ const POS = () => {
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const [showQRISModal, setShowQRISModal] = useState(false);
   const [dynamicQRIS, setDynamicQRIS] = useState('');
+  const [qrisChargeAmount, setQrisChargeAmount] = useState(0);
   const [qrisString, setQrisString] = useState('');
   const [telegramConfig, setTelegramConfig] = useState({ token: '', chatId: '' });
   const [waGatewayConfig, setWaGatewayConfig] = useState({ token: '', url: '/api/fonnte/send', provider: 'fonnte', numberKey: '', customTemplate: '', shopName: 'Vrimae' });
@@ -90,6 +91,11 @@ const POS = () => {
     }
   }, [editingCartItem]);
   const { isAdmin } = useContext(AuthContext);
+  const isTouchDevice = useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches,
+    []
+  );
+  const canDragProduct = isAdmin && !isTouchDevice;
 
   useEffect(() => {
     if (!customerPhone.trim()) {
@@ -381,35 +387,52 @@ const POS = () => {
   };
 
   useEffect(() => {
-    fetchProducts();
-    getAddOns().then(setAddOns);
-    getCategories().then(cats => {
-      setCategories(cats);
-      setNewMenu(prev => ({ ...prev, category: prev.category || cats[0] || '' }));
-    });
-    fetchInventoryAndRecipes();
-    getUser().then((user: any) => {
-      if (user?.user_metadata) {
-        if (user.user_metadata.qris_string) {
-          setQrisString(user.user_metadata.qris_string);
+    let mounted = true;
+    setLoading(true);
+    Promise.all([
+      getProducts(),
+      getAddOns(),
+      getCategories(),
+      getInventory(),
+      getUser(),
+      checkIsActiveSubscription(),
+    ])
+      .then(([prodData, addonsData, cats, invData, user, activeSub]) => {
+        if (!mounted) return;
+        setProducts(prodData);
+        setAddOns(addonsData);
+        setCategories(cats);
+        setNewMenu(prev => ({ ...prev, category: prev.category || cats[0] || '' }));
+        setInventory(invData);
+        setIsActiveSubscription(activeSub);
+
+        if (user?.user_metadata) {
+          if (user.user_metadata.qris_string) {
+            setQrisString(user.user_metadata.qris_string);
+          }
+          setTelegramConfig({
+            token: user.user_metadata.telegram_bot_token || '',
+            chatId: user.user_metadata.telegram_chat_id || ''
+          });
+          const isSuperAdmin = user.email === 'bimdarmawa2@gmail.com' || user.email === 'vrimae23@gmail.com';
+          const defaultWaToken = isSuperAdmin ? 'SbmGAc1TxotP4TGuCGpS' : '';
+          setWaGatewayConfig({
+            token: user.user_metadata.wa_gateway_token || defaultWaToken,
+            url: (user.user_metadata?.wa_gateway_url === 'https://api.fonnte.com/send') ? '/api/fonnte/send' : (user.user_metadata?.wa_gateway_url || '/api/fonnte/send'),
+            provider: user.user_metadata.wa_gateway_provider || 'fonnte',
+            numberKey: user.user_metadata.wa_gateway_number_key || '',
+            customTemplate: user.user_metadata.wa_custom_template || '',
+            shopName: user.user_metadata.shop_name || 'Vrimae'
+          });
         }
-        setTelegramConfig({
-          token: user.user_metadata.telegram_bot_token || '',
-          chatId: user.user_metadata.telegram_chat_id || ''
-        });
-        const isSuperAdmin = user.email === 'bimdarmawa2@gmail.com' || user.email === 'vrimae23@gmail.com';
-        const defaultWaToken = isSuperAdmin ? 'SbmGAc1TxotP4TGuCGpS' : '';
-        setWaGatewayConfig({
-          token: user.user_metadata.wa_gateway_token || defaultWaToken,
-          url: (user.user_metadata?.wa_gateway_url === 'https://api.fonnte.com/send') ? '/api/fonnte/send' : (user.user_metadata?.wa_gateway_url || '/api/fonnte/send'),
-          provider: user.user_metadata.wa_gateway_provider || 'fonnte',
-          numberKey: user.user_metadata.wa_gateway_number_key || '',
-          customTemplate: user.user_metadata.wa_custom_template || '',
-          shopName: user.user_metadata.shop_name || 'Vrimae'
-        });
-      }
-    });
-    checkIsActiveSubscription().then(setIsActiveSubscription);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // ── Add-on CRUD ──────────────────────────────────────────────
@@ -627,8 +650,14 @@ const POS = () => {
       // Telegram Notification
       if (telegramConfig.token && telegramConfig.chatId) {
         try {
-          const itemList = cart.map(item => `- ${item.quantity}x ${item.product.name} (Rp ${(item.customUnitPrice !== undefined ? item.customUnitPrice : item.product.price).toLocaleString('id-ID')})${item.note ? `\n  Catatan: ${item.note}` : ''}`).join('\n');
-          const message = `🔔 *Transaksi Baru (Vrimae)*\n\n*ID:* ${txId}\n*Total:* Rp ${totalAmount.toLocaleString('id-ID')}\n*Metode:* ${paymentMethod}\n*Pelanggan:* ${customerName.trim() || 'Umum'}\n\n*Pesanan:*\n${itemList}`;
+          const itemList = finishedTx.items.map((item: CartItem) => {
+            const unitPrice = item.customUnitPrice !== undefined ? item.customUnitPrice : getBaseUnitPrice(item);
+            return `- ${item.quantity}x ${item.product.name} (Rp ${Math.round(unitPrice).toLocaleString('id-ID')})${item.note ? `\n  Catatan: ${item.note}` : ''}`;
+          }).join('\n');
+          const paidInfo = finishedTx.poStatus === 'pending'
+            ? `Rp ${Math.round(finishedTx.poDpAmount ?? finishedTx.total).toLocaleString('id-ID')} (DP dari Total Rp ${Math.round(finishedTx.total).toLocaleString('id-ID')})`
+            : `Rp ${Math.round(finishedTx.total).toLocaleString('id-ID')}`;
+          const message = `🔔 *Transaksi Baru (Vrimae)*\n\n*ID:* ${txId}\n*Total:* ${paidInfo}\n*Metode:* ${finishedTx.paymentMethod}\n*Pelanggan:* ${finishedTx.customerName}\n\n*Pesanan:*\n${itemList}`;
           
           fetch(`https://api.telegram.org/bot${telegramConfig.token}/sendMessage`, {
             method: 'POST',
@@ -682,6 +711,8 @@ const POS = () => {
     }
 
     const totalAmount = calculateTotal();
+    const parsedDp = orderType === 'po' && poDpAmount ? Number(poDpAmount.replace(/\D/g, '')) : totalAmount;
+    const payableAmount = orderType === 'po' ? (parsedDp > 0 ? parsedDp : totalAmount) : totalAmount;
     
     // QRIS Flow
     if (['QRIS', 'DANA', 'SeaBank'].includes(paymentMethod)) {
@@ -690,7 +721,8 @@ const POS = () => {
         setIsSubmitting(false);
         return;
       }
-      const dynQris = generateDynamicQRIS(qrisString, totalAmount);
+      const dynQris = generateDynamicQRIS(qrisString, payableAmount);
+      setQrisChargeAmount(payableAmount);
       setDynamicQRIS(dynQris);
       setShowQRISModal(true);
       setIsSubmitting(false);
@@ -836,17 +868,33 @@ const POS = () => {
     boxShadow: 'none',
   });
 
-  const filteredProducts = products.filter(p => {
-    if (categoryFilter !== 'all') {
-      if (categoryFilter === 'other') {
-        if (p.category && categories.includes(p.category)) return false;
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: products.length, other: 0 };
+    categories.forEach(cat => { counts[cat] = 0; });
+    products.forEach(p => {
+      if (!p.category || !categories.includes(p.category)) {
+        counts.other = (counts.other || 0) + 1;
       } else {
-        if (p.category !== categoryFilter) return false;
+        counts[p.category] = (counts[p.category] || 0) + 1;
       }
-    }
-    if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
+    });
+    return counts;
+  }, [products, categories]);
+
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return products.filter(p => {
+      if (categoryFilter !== 'all') {
+        if (categoryFilter === 'other') {
+          if (p.category && categories.includes(p.category)) return false;
+        } else {
+          if (p.category !== categoryFilter) return false;
+        }
+      }
+      if (q && !p.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [products, categories, categoryFilter, searchQuery]);
 
   return (
     <div className="pos-page-container">
@@ -914,14 +962,7 @@ const POS = () => {
           {['all', ...categories, 'other'].map(cat => {
           const isActive = categoryFilter === cat;
           const isDraggedOver = draggedOverTab === cat;
-          let count = 0;
-          if (cat === 'all') {
-            count = products.length;
-          } else if (cat === 'other') {
-            count = products.filter(p => !p.category || !categories.includes(p.category)).length;
-          } else {
-            count = products.filter(p => p.category === cat).length;
-          }
+          const count = categoryCounts[cat] || 0;
           const label = cat === 'all' ? 'Semua Menu' : (cat === 'other' ? 'Lainnya' : cat);
           
           if (cat === 'other' && count === 0) return null; // Don't show Lainnya tab if empty
@@ -1017,14 +1058,14 @@ const POS = () => {
                 }
                 openAddOnModal(product);
               }}
-              draggable={true}
-              onDragStart={(e) => handleDragStart(e, product.id)}
-              onDragEnd={handleDragEnd}
+              draggable={canDragProduct}
+              onDragStart={canDragProduct ? (e) => handleDragStart(e, product.id) : undefined}
+              onDragEnd={canDragProduct ? handleDragEnd : undefined}
               style={{
                 borderRadius: '16px',
                 border: '1.5px solid var(--color-border-light)',
                 background: 'var(--color-surface)',
-                cursor: 'grab',
+                cursor: canDragProduct ? 'grab' : 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
                 boxShadow: isDragging ? 'none' : '0 2px 8px rgba(0,0,0,0.07)',
@@ -1796,9 +1837,9 @@ const POS = () => {
                               return (
                                 <div
                                   key={p.id}
-                                  draggable
-                                  onDragStart={(e) => handleDragStart(e, p.id)}
-                                  onDragEnd={handleDragEnd}
+                                  draggable={canDragProduct}
+                                  onDragStart={canDragProduct ? (e) => handleDragStart(e, p.id) : undefined}
+                                  onDragEnd={canDragProduct ? handleDragEnd : undefined}
                                   style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -2002,7 +2043,9 @@ const POS = () => {
                 <MessageCircle size={26} color="#22C55E" style={{ flexShrink: 0 }} />
                 <div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text)' }}>Member: {lastTransaction.customerName || 'Pelanggan'} ({lastTransaction.customerPhone}) {lastTransaction.purchaseCount ? `• Pembelian ke-${lastTransaction.purchaseCount} 🎉` : ''}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>Pesan ucapan & struk WhatsApp otomatis terbuka!</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+                    {waGatewayConfig.token ? 'Pesan ucapan & struk WhatsApp dikirim otomatis!' : 'Klik tombol di bawah untuk mengirim struk WhatsApp.'}
+                  </div>
                 </div>
               </div>
             )}
@@ -2156,7 +2199,7 @@ const POS = () => {
               </div>
 
               <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.88rem', marginBottom: '0.4rem' }}>
-                Total Pembayaran
+                {orderType === 'po' && qrisChargeAmount < calculateTotal() ? 'Nominal Pembayaran DP (PO)' : 'Total Pembayaran'}
               </p>
               <div style={{
                 fontSize: 'clamp(1.8rem, 6vw, 2.4rem)',
@@ -2165,7 +2208,7 @@ const POS = () => {
                 letterSpacing: '-0.5px',
                 textShadow: '0 2px 8px rgba(0,0,0,0.15)',
               }}>
-                {formatCurrency(calculateTotal())}
+                {formatCurrency(qrisChargeAmount || calculateTotal())}
               </div>
             </div>
 
@@ -2253,7 +2296,7 @@ const POS = () => {
                 marginBottom: '1.25rem',
                 padding: '0 0.5rem',
               }}>
-                Arahkan kamera ke QR di atas. Nominal <strong style={{ color: 'var(--color-primary)' }}>{formatCurrency(calculateTotal())}</strong> akan terisi otomatis.
+                Arahkan kamera ke QR di atas. Nominal <strong style={{ color: 'var(--color-primary)' }}>{formatCurrency(qrisChargeAmount || calculateTotal())}</strong> akan terisi otomatis.
               </p>
 
               {/* Confirm Button */}

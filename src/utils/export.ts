@@ -16,17 +16,20 @@ const autoSizeCols = (data: any[], headers: string[]) => {
   });
 };
 
-
 // ═══════════════════════════════════════════════════════════
-// Simple CSV export
+// Simple CSV export (UTF-8 BOM compatible with Excel Windows/macOS)
 // ═══════════════════════════════════════════════════════════
 export const exportToCSV = (filename: string, data: any[]) => {
   if (data.length === 0) return;
-  const headers = Object.keys(data[0]).join(',');
+  const escapeCsvCell = (val: any) => {
+    const str = val === null || val === undefined ? '' : String(val);
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+  const headers = Object.keys(data[0]).map(escapeCsvCell).join(',');
   const rows = data.map(obj =>
-    Object.values(obj).map(val => `"${val}"`).join(',')
+    Object.values(obj).map(escapeCsvCell).join(',')
   ).join('\n');
-  const csvContent = `${headers}\n${rows}`;
+  const csvContent = `\uFEFF${headers}\n${rows}`;
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   downloadBlob(blob, `${filename}.csv`);
 };
@@ -45,7 +48,7 @@ export const exportToExcel = (filename: string, data: any[]) => {
   const worksheet = XLSX.utils.json_to_sheet(formattedData);
   const keys = Object.keys(formattedData[0]);
   worksheet['!cols'] = autoSizeCols(formattedData, keys);
-  
+
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
   XLSX.writeFile(workbook, `${filename}.xlsx`);
@@ -116,10 +119,10 @@ export const exportToExcelAdvanced = (
     'Kategori Menu': t['category menu'] || '-',
     'Jumlah (Rp)': formatCurrency(t.amount),
   }));
-  
+
   const ws1 = XLSX.utils.json_to_sheet(ws1Data);
   ws1['!cols'] = autoSizeCols(ws1Data, Object.keys(ws1Data[0]));
-  XLSX.utils.book_append_sheet(workbook, ws1, "Riwayat Transaksi");
+  XLSX.utils.book_append_sheet(workbook, ws1, 'Riwayat Transaksi');
 
   // ═══════════════════════════════════════════════════
   // SHEET 2: Analisis Menu
@@ -129,10 +132,9 @@ export const exportToExcelAdvanced = (
     const pct = totalSold > 0 ? ((data.qty / totalSold) * 100).toFixed(1) + '%' : '0%';
     return [idx + 1, name, catLabel, data.qty, formatCurrency(data.revenue), pct];
   });
-  
+
   menuRows.push(['', 'TOTAL', '', totalSold, formatCurrency(menuRanking.reduce((s, [, v]) => s + v.revenue, 0)), '100%']);
-  
-  // Data for Pie Chart (Category Sales)
+
   const catSales: Record<string, { qty: number; revenue: number }> = {};
   menuRanking.forEach(([, data]) => {
     const catLabel = data.category || 'Umum';
@@ -159,10 +161,10 @@ export const exportToExcelAdvanced = (
     ['Kategori', 'Jumlah Terjual', 'Pendapatan (Rp)', 'Persentase'],
     ...catRows
   ];
-  
+
   const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
   ws2['!cols'] = [{ wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 15 }];
-  XLSX.utils.book_append_sheet(workbook, ws2, "Analisis Menu");
+  XLSX.utils.book_append_sheet(workbook, ws2, 'Analisis Menu');
 
   // ═══════════════════════════════════════════════════
   // SHEET 3: Analisis Pelanggan
@@ -193,7 +195,7 @@ export const exportToExcelAdvanced = (
 
   const ws3 = XLSX.utils.aoa_to_sheet(ws3Data);
   ws3['!cols'] = [{ wch: 10 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 15 }];
-  XLSX.utils.book_append_sheet(workbook, ws3, "Analisis Pelanggan");
+  XLSX.utils.book_append_sheet(workbook, ws3, 'Analisis Pelanggan');
 
   // ═══════════════════════════════════════════════════
   // SHEET 4: Ringkasan Keuangan
@@ -205,9 +207,10 @@ export const exportToExcelAdvanced = (
 
   const dailyData: Record<string, { income: number; expense: number }> = {};
   transactions.forEach(t => {
-    if (!dailyData[t.date]) dailyData[t.date] = { income: 0, expense: 0 };
-    if (t.tipe === 'income') dailyData[t.date].income += t.amount;
-    else dailyData[t.date].expense += t.amount;
+    const dayKey = String(t.date || '').substring(0, 10);
+    if (!dailyData[dayKey]) dailyData[dayKey] = { income: 0, expense: 0 };
+    if (t.tipe === 'income') dailyData[dayKey].income += t.amount;
+    else dailyData[dayKey].expense += t.amount;
   });
 
   const dailyRows = Object.entries(dailyData)
@@ -217,11 +220,15 @@ export const exportToExcelAdvanced = (
       return [date, formatCurrency(data.income), formatCurrency(data.expense), formatCurrency(dailyProfit)];
     });
 
-  const paymentStats = { 'Tunai': 0, 'Non-Tunai': 0 };
+  const paymentStats: Record<string, number> = { Tunai: 0, 'Non-Tunai (QRIS/Transfer/E-Wallet)': 0 };
   transactions.forEach(t => {
-    if (t.tipe === 'income' && t['metode pembayaran']) {
-      if (t['metode pembayaran'] === 'Tunai') paymentStats['Tunai'] += t.amount;
-      if (t['metode pembayaran'] === 'Non-Tunai') paymentStats['Non-Tunai'] += t.amount;
+    const method = t['metode pembayaran'];
+    if (t.tipe === 'income' && method && method !== '-') {
+      if (method === 'Tunai') {
+        paymentStats['Tunai'] += t.amount;
+      } else {
+        paymentStats['Non-Tunai (QRIS/Transfer/E-Wallet)'] += t.amount;
+      }
     }
   });
 
@@ -238,7 +245,7 @@ export const exportToExcelAdvanced = (
     [],
     ['Metode', 'Total Pendapatan (Rp)'],
     ['Tunai', formatCurrency(paymentStats['Tunai'])],
-    ['Non-Tunai', formatCurrency(paymentStats['Non-Tunai'])],
+    ['Non-Tunai (QRIS/Transfer/E-Wallet)', formatCurrency(paymentStats['Non-Tunai (QRIS/Transfer/E-Wallet)'])],
     [], [],
     ['📅 DATA HARIAN (PEMASUKAN VS PENGELUARAN)'],
     ['(Pilih tabel ini di Excel lalu Insert -> Chart -> Line Chart)'],
@@ -248,12 +255,9 @@ export const exportToExcelAdvanced = (
   ];
 
   const ws4 = XLSX.utils.aoa_to_sheet(ws4Data);
-  ws4['!cols'] = [{ wch: 20 }, { wch: 25 }, { wch: 25 }, { wch: 20 }];
-  XLSX.utils.book_append_sheet(workbook, ws4, "Ringkasan Keuangan");
+  ws4['!cols'] = [{ wch: 34 }, { wch: 25 }, { wch: 25 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(workbook, ws4, 'Ringkasan Keuangan');
 
-  // ═══════════════════════════════════════════════════
-  // Generate and download
-  // ═══════════════════════════════════════════════════
   XLSX.writeFile(workbook, `${filename}.xlsx`);
 };
 
@@ -267,5 +271,6 @@ const downloadBlob = (blob: Blob, filename: string) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 };
